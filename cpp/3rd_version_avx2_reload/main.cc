@@ -9,20 +9,12 @@
 #include <string>
 #include <vector>
 
-#include "label.h"
+#include "../label.h"
+#include "resnet_avx2_preload.h"
 
-// set USE_AVX2_INST to 1 to enable avx2 instruction optimization
-#define USE_AVX2_INST (1)
-
-#if USE_AVX2_INST
-#include "resnet_avx2.h"
-#else
-#include "resnet.h"
-#endif
-
-std::vector<std::string> getFileName() {
+static std::vector<std::string> GetFileName() {
   std::vector<std::string> filenames;
-  std::string dir_path("../pics/ani_12/");
+  std::string dir_path("../../pics/ani_12/");
   // filenames.push_back(dir_path + std::string("Niu.jpg"));
   // return filenames;
   DIR* dir = opendir(dir_path.c_str());
@@ -32,18 +24,20 @@ std::vector<std::string> getFileName() {
   }
   dirent* entry;
   while ((entry = readdir(dir)) != nullptr) {
-    if (entry->d_type == DT_REG) {  // 如果是普通文件
+    if (entry->d_type == DT_REG) {
       filenames.push_back(dir_path + std::string(entry->d_name));
     }
   }
   closedir(dir);
+  std::cout << "Read Files:" << std::endl;
   for (const auto& filename : filenames) {
     std::cout << filename << std::endl;
   }
+  std::cout << "\n\n" << std::endl;
   return filenames;
 }
 
-float* preprocess(const std::string& file_name) {
+static float* PreProcess(const std::string& file_name) {
   auto transpose2d = [](uint8_t* src, uint8_t* dst) {
     memcpy(dst, src, 224 * 224 * 3);
     return;
@@ -69,7 +63,6 @@ float* preprocess(const std::string& file_name) {
   float* mat_data = (float*)malloc(224 * 224 * 3 * sizeof(float));
   cv::Mat source_o, img_o, img_r;
   source_o = cv::imread(file_name);
-  // printf("%d %d\n", source_o.rows, source_o.cols);
   cv::cvtColor(source_o, img_o, cv::COLOR_BGR2RGB);
   cv::resize(img_o, img_r, {224, 224});
   // show(img_r, 256, 256);
@@ -91,7 +84,7 @@ float* preprocess(const std::string& file_name) {
   return mat_data;
 }
 
-void show_res(float* res) {
+void ShowResult(float* res) {
   int n_ele = 1000;
   std::vector<std::pair<float, int>> sort_pairs;
   for (int i = 0; i < n_ele; ++i) {
@@ -103,6 +96,7 @@ void show_res(float* res) {
             });
   auto labels = load_imagenet_labels();
   const int topk = 5;
+  std::cout << ">>> Result:" << std::endl;
   for (int i = 0; i < topk; ++i) {
     std::cout << "top " << (i + 1) << " " << sort_pairs[i].first << " -> Index=["
               << sort_pairs[i].second << "]"
@@ -111,54 +105,67 @@ void show_res(float* res) {
   }
 }
 
-auto getTime() {
-  auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
-                       std::chrono::system_clock::now().time_since_epoch())
-                       .count();
+int GetTime() {
+  int timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                      std::chrono::system_clock::now().time_since_epoch())
+                      .count();
   return timestamp;
 }
 
 int main() {
-  const auto& files = getFileName();
+  PreLoadParams();
+  const auto& files = GetFileName();
+  int total_time = 0;
   for (auto it : files) {
-    auto start = getTime();
-    std::cout << "Predict : " << it << std::endl;
-    auto img = preprocess(it);
+    std::cout << "\nBegin to predict : " << it << std::endl;
+    auto img = PreProcess(it);
+
+    int start = GetTime();
+
     int h0, w0, c0;
     int h1, w1, c1;
-    img = compute_conv_layer(img, 224, 224, h1, w1, c1, "conv1");
-    img = compute_bn_layer(img, h1, w1, c1, "bn1");
-    img = compute_relu_layer(img, h1 * w1 * c1);
-    img = compute_maxpool_layer(img);
+    img = ComputeLayerConv2d<false>(img, 224, 224, h1, w1, c1, "conv1");
+    img = ComputeLayerBatchNorm<false>(img, h1, w1, c1, "bn1");
+    img = ComputeLayerRelu<false>(img, h1 * w1 * c1);
+    img = ComputeLayerMaxPool<false>(img);
     // layer1
-    img = compute_bottleneck(img, 56, 56, h1, w1, c1, "layer1_bottleneck0", true);
-    img = compute_bottleneck(img, h1, w1, h0, w0, c0, "layer1_bottleneck1", false);
-    img = compute_bottleneck(img, h0, w0, h1, w1, c1, "layer1_bottleneck2", false);
+    img = ComputeBottleNeck<false>(img, 56, 56, h1, w1, c1, "layer1_bottleneck0", true);
+    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer1_bottleneck1", false);
+    img = ComputeBottleNeck<false>(img, h0, w0, h1, w1, c1, "layer1_bottleneck2", false);
     // layer2
-    img = compute_bottleneck(img, h1, w1, h0, w0, c0, "layer2_bottleneck0", true);
-    img = compute_bottleneck(img, h0, w0, h1, w1, c1, "layer2_bottleneck1", false);
-    img = compute_bottleneck(img, h1, w1, h0, w0, c0, "layer2_bottleneck2", false);
-    img = compute_bottleneck(img, h0, w0, h1, w1, c1, "layer2_bottleneck3", false);
+    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer2_bottleneck0", true);
+    img = ComputeBottleNeck<false>(img, h0, w0, h1, w1, c1, "layer2_bottleneck1", false);
+    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer2_bottleneck2", false);
+    img = ComputeBottleNeck<false>(img, h0, w0, h1, w1, c1, "layer2_bottleneck3", false);
     // layer3
-    img = compute_bottleneck(img, h1, w1, h0, w0, c0, "layer3_bottleneck0", true);
-    img = compute_bottleneck(img, h0, w0, h1, w1, c1, "layer3_bottleneck1", false);
-    img = compute_bottleneck(img, h1, w1, h0, w0, c0, "layer3_bottleneck2", false);
-    img = compute_bottleneck(img, h0, w0, h1, w1, c1, "layer3_bottleneck3", false);
-    img = compute_bottleneck(img, h1, w1, h0, w0, c0, "layer3_bottleneck4", false);
-    img = compute_bottleneck(img, h0, w0, h1, w1, c1, "layer3_bottleneck5", false);
+    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer3_bottleneck0", true);
+    img = ComputeBottleNeck<false>(img, h0, w0, h1, w1, c1, "layer3_bottleneck1", false);
+    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer3_bottleneck2", false);
+    img = ComputeBottleNeck<false>(img, h0, w0, h1, w1, c1, "layer3_bottleneck3", false);
+    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer3_bottleneck4", false);
+    img = ComputeBottleNeck<false>(img, h0, w0, h1, w1, c1, "layer3_bottleneck5", false);
     // layer4
-    img = compute_bottleneck(img, h1, w1, h0, w0, c0, "layer4_bottleneck0", true);
-    img = compute_bottleneck(img, h0, w0, h1, w1, c1, "layer4_bottleneck1", false);
-    img = compute_bottleneck(img, h1, w1, h0, w0, c0, "layer4_bottleneck2", false);
+    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer4_bottleneck0", true);
+    img = ComputeBottleNeck<false>(img, h0, w0, h1, w1, c1, "layer4_bottleneck1", false);
+    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer4_bottleneck2", false);
     // avg pool
-    img = compute_avgpool_layer(img);
+    img = ComputeLayerAvgPool<false>(img);
     // Linear
-    img = compute_fc_layer(img, "fc");
+    img = ComputeLayerFC<false>(img, "fc");
 
-    auto end = getTime();
-    std::cout << "Time cost : " << end - start << " ms." << std::endl;
-    show_res(img);
+    int end = GetTime();
+    int time = end - start;
+    total_time += time;
+    ShowResult(img);
+
+    std::cout << "Time cost : " << time << " ms.\n" << std::endl;
     free(img);
+  }
+  float latency = (float)(total_time) / (float)(files.size());
+  std::cout << "\033[0;32mAverage Latency : " << latency << "ms \033[0m" << std::endl;
+  std::cout << "\033[0;32mAverage Throughput : " << (1000 / latency) << "fps \033[0m" << std::endl;
+  for (auto it : __global_params) {
+    free(it.second);
   }
   return 0;
 }

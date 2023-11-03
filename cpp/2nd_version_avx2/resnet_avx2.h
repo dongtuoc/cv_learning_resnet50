@@ -6,8 +6,6 @@
 #include <opencv2/opencv.hpp>
 #include <string>
 
-#include "label.h"
-
 #define DEBUG_SHOW (0)
 
 static inline void show(float* out, int len) {
@@ -20,6 +18,7 @@ static inline void show(float* out, int len) {
   exit(0);
 }
 
+template <bool is_first = false>
 static float* my_conv2d(float* img,
                         float* weight,
                         int hi,
@@ -48,20 +47,44 @@ static float* my_conv2d(float* img,
         const int filter_w_start = std::max(0, -in_w_origin);
         const int filter_h_end = std::min(kernel, hi - in_h_origin);
         const int filter_w_end = std::min(kernel, wi - in_w_origin);
-        float acc = 0;
-        for (int kh_idx = filter_h_start; kh_idx < filter_h_end; kh_idx++) {
-          const int hi_index = in_h_origin + kh_idx;
-          for (int kw_idx = filter_w_start; kw_idx < filter_w_end; kw_idx++) {
-            const int wi_index = in_w_origin + kw_idx;
-            for (int ci_ = 0; ci_ < ci; ci_++) {
-              auto in_data = img[hi_index * wi * ci + wi_index * ci + ci_];
-              auto weight_data =
-                  weight[co_idx * kernel * kernel * ci + kh_idx * kernel * ci + kw_idx * ci + ci_];
-              acc += in_data * weight_data;
+        register float acc = 0;
+        if (is_first) {
+          for (int kh_idx = filter_h_start; kh_idx < filter_h_end; kh_idx++) {
+            const int hi_index = in_h_origin + kh_idx;
+            for (int kw_idx = filter_w_start; kw_idx < filter_w_end; kw_idx++) {
+              const int wi_index = in_w_origin + kw_idx;
+              for (int ci_ = 0; ci_ < 3; ci_++) {
+                auto in_data = img[hi_index * 224 * 3 + wi_index * 3 + ci_];
+                auto weight_data = weight[co_idx * 49 * 3 + kh_idx * 7 * 3 + kw_idx * 3 + ci_];
+                acc += in_data * weight_data;
+              }
             }
           }
+          out[ho_idx * wo * co + wo_idx * co + co_idx] = acc;
+        } else {
+          // use avx2 vec inst to optimize Mul-add operation
+          const int vec_size = 8;
+          for (int kh_idx = filter_h_start; kh_idx < filter_h_end; kh_idx++) {
+            const register int hi_index = in_h_origin + kh_idx;
+            for (int kw_idx = filter_w_start; kw_idx < filter_w_end; kw_idx++) {
+              const register int wi_index = in_w_origin + kw_idx;
+              // Load input and weight data into vectors
+              __m256 in_vec, weight_vec;
+              for (int ci_ = 0; ci_ < ci; ci_ += vec_size) {
+                in_vec = _mm256_loadu_ps(&img[hi_index * wi * ci + wi_index * ci + ci_]);
+                weight_vec = _mm256_loadu_ps(&weight[co_idx * kernel * kernel * ci +
+                                                     kh_idx * kernel * ci + kw_idx * ci + ci_]);
+                in_vec = _mm256_mul_ps(in_vec, weight_vec);
+                // Add the elements of the accumulator vector and store the result
+                float* acc_ptr = (float*)&in_vec;
+                for (int i = 0; i < vec_size; i++) {
+                  acc += acc_ptr[i];
+                }
+              }
+            }
+          }
+          out[ho_idx * wo * co + wo_idx * co + co_idx] = acc;
         }
-        out[ho_idx * wo * co + wo_idx * co + co_idx] = acc;
       }
     }
   }
@@ -98,14 +121,14 @@ static float* my_fc(float* img, float* weight, float* bias) {
 }
 
 static float* my_max_pool(float* img) {
-  auto hi = 112;
-  auto wi = 112;
-  auto channel = 64;
-  auto pad = 1;
-  auto stride = 2;
-  auto kernel = 3;
-  auto ho = (hi + 2 * pad - kernel) / stride + 1;
-  auto wo = (wi + 2 * pad - kernel) / stride + 1;
+  const auto hi = 112;
+  const auto wi = 112;
+  const auto channel = 64;
+  const auto pad = 1;
+  const auto stride = 2;
+  const auto kernel = 3;
+  const auto ho = (hi + 2 * pad - kernel) / stride + 1;
+  const auto wo = (wi + 2 * pad - kernel) / stride + 1;
 #if DEBUG_SHOW
   printf("maxpool in: (%d, %d, %d)\n", hi, wi, channel);
 #endif
@@ -141,14 +164,14 @@ static float* my_max_pool(float* img) {
 }
 
 static float* my_avg_pool(float* img) {
-  auto hi = 7;
-  auto wi = 7;
-  auto channel = 2048;
-  auto pad = 0;
-  auto stride = 1;
-  auto kernel = 7;
-  auto ho = (hi + 2 * pad - kernel) / stride + 1;
-  auto wo = (wi + 2 * pad - kernel) / stride + 1;
+  const auto hi = 7;
+  const auto wi = 7;
+  const auto channel = 2048;
+  const auto pad = 0;
+  const auto stride = 1;
+  const auto kernel = 7;
+  const auto ho = (hi + 2 * pad - kernel) / stride + 1;
+  const auto wo = (wi + 2 * pad - kernel) / stride + 1;
   float* out = (float*)malloc(ho * wo * channel * sizeof(float));
 #if DEBUG_SHOW
   printf("avgpool in: (%d, %d, %d)\n", hi, wi, channel);
@@ -164,6 +187,7 @@ static float* my_avg_pool(float* img) {
         auto filter_h_end = std::min(kernel, hi - in_h_origin);
         auto filter_w_end = std::min(kernel, wi - in_w_origin);
         float sum = float(0);
+        int k_size = (filter_h_end - filter_h_start) * (filter_w_end - filter_w_start);
         for (auto kh_idx = filter_h_start; kh_idx < filter_h_end; kh_idx++) {
           auto hi_index = in_h_origin + kh_idx;
           for (auto kw_idx = filter_w_start; kw_idx < filter_w_end; kw_idx++) {
@@ -172,7 +196,7 @@ static float* my_avg_pool(float* img) {
             sum += in_data;
           }
         }
-        out[ho_idx * wo * channel + wo_idx * channel + c_] = sum / (kernel * kernel);
+        out[ho_idx * wo * channel + wo_idx * channel + c_] = sum / k_size;
       }
     }
   }
@@ -238,12 +262,12 @@ T* load_data_from_file(const std::string& file_name, int len, bool is_float) {
 }
 
 static float* load_conv_weight(const std::string& name, int len) {
-  auto file_name = "../model/resnet50_weight/resnet50_" + name + "_weight.txt";
+  auto file_name = "../../model/resnet50_weight/resnet50_" + name + "_weight.txt";
   return load_data_from_file<float>(file_name, len, true);
 }
 
 static int* load_conv_param(const std::string& name, int len) {
-  auto file_name = "../model/resnet50_weight/resnet50_" + name + "_param.txt";
+  auto file_name = "../../model/resnet50_weight/resnet50_" + name + "_param.txt";
   return load_data_from_file<int>(file_name, len, false);
 }
 
@@ -266,15 +290,20 @@ static float* compute_conv_layer(float* img,
   auto stride = param[3];
   auto pad = param[4];
   auto weight = load_conv_weight(layer_name, co * kernel * kernel * ci);
-  return my_conv2d(img, weight, hi, wi, ho, wo, ci, co, kernel, stride, pad, is_free_img);
+  if (hi == 224) {
+    return my_conv2d<true>(img, weight, hi, wi, ho, wo, ci, co, kernel, stride, pad, is_free_img);
+  } else {
+    return my_conv2d(img, weight, hi, wi, ho, wo, ci, co, kernel, stride, pad, is_free_img);
+  }
 }
 
 static float* compute_fc_layer(float* img, const std::string& layer_name) {
 #if DEBUG_SHOW
   std::cout << "-- compute " << layer_name << std::endl;
 #endif
-  std::string weight_file_name = "../model/resnet50_weight/resnet50_" + layer_name + "_weight.txt";
-  std::string bias_file_name = "../model/resnet50_weight/resnet50_" + layer_name + "_bias.txt";
+  std::string weight_file_name =
+      "../../model/resnet50_weight/resnet50_" + layer_name + "_weight.txt";
+  std::string bias_file_name = "../../model/resnet50_weight/resnet50_" + layer_name + "_bias.txt";
   auto weight = load_data_from_file<float>(weight_file_name, 1000 * 2048, true);
   auto bias = load_data_from_file<float>(bias_file_name, 1000, true);
   return my_fc(img, weight, bias);
@@ -284,10 +313,10 @@ static float* compute_bn_layer(float* in_data, int h, int w, int c, const std::s
 #if DEBUG_SHOW
   std::cout << "-- compute " << layer_name << std::endl;
 #endif
-  auto weight_file_name = "../model/resnet50_weight/resnet50_" + layer_name + "_weight.txt";
-  auto bias_file_name = "../model/resnet50_weight/resnet50_" + layer_name + "_bias.txt";
-  auto mean_file_name = "../model/resnet50_weight/resnet50_" + layer_name + "_running_mean.txt";
-  auto var_file_name = "../model/resnet50_weight/resnet50_" + layer_name + "_running_var.txt";
+  auto weight_file_name = "../../model/resnet50_weight/resnet50_" + layer_name + "_weight.txt";
+  auto bias_file_name = "../../model/resnet50_weight/resnet50_" + layer_name + "_bias.txt";
+  auto mean_file_name = "../../model/resnet50_weight/resnet50_" + layer_name + "_running_mean.txt";
+  auto var_file_name = "../../model/resnet50_weight/resnet50_" + layer_name + "_running_var.txt";
   auto gamma = load_data_from_file<float>(weight_file_name, c, true);
   auto bias = load_data_from_file<float>(bias_file_name, c, true);
   auto mean = load_data_from_file<float>(mean_file_name, c, true);
@@ -335,8 +364,15 @@ static float* compute_bottleneck(float* in_data,
   auto bn_out = compute_bn_layer(out, h0, w0, c0, bottleneck_layer_name + std::string("_bn3"));
 
   auto add = [](float* l, float* r, float* out, int len) -> float* {
-    for (int i = 0; i < len; i++) {
-      out[i] = l[i] + r[i];
+    for (int i = 0; i < len; i += 8) {
+      out[i + 0] = l[i + 0] + r[i + 0];
+      out[i + 1] = l[i + 1] + r[i + 1];
+      out[i + 2] = l[i + 2] + r[i + 2];
+      out[i + 3] = l[i + 3] + r[i + 3];
+      out[i + 4] = l[i + 4] + r[i + 4];
+      out[i + 5] = l[i + 5] + r[i + 5];
+      out[i + 6] = l[i + 6] + r[i + 6];
+      out[i + 7] = l[i + 7] + r[i + 7];
     }
     return out;
   };
