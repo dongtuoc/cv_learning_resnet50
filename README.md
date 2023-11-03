@@ -8,7 +8,9 @@
 本项目旨在进行 resnet50 的算法原理学习和实战,以及基于该网络的**性能优化**。
 
 - 原理学习会输出一些包含解析 resnet50 中用到的算法和背景知识。
+
 - 实战部分会用python/C++两种语言完成 resnet50 的网络手写。其中resnet50的所有核心算法和网络结构全部手写，不借用任何第三方库，由于是自己手写的算法和网络，因此会有很大的自由度进行性能优化，性能优化也就是本项目最后进行的部分，会持续很长时间，迭代很多个版本。
+
 - 实战部分在完成手写算法的基础上，除了要保证网络精度可用（也就是任意给一张图片，经过预处理之后，Top5 可以正确的预测出图片）之外，更重要的我会关注在性能优化部分，这一点后面会有介绍。
 
 #### 为什么要全部手写核心算法
@@ -16,6 +18,7 @@
 目前很多教程或者课程，在教你手搭神经网络的时候，基本都是基于 torch 的 nn 模块或其他模块，用 nn.conv2d 完成卷积的计算。
 
 对于不想深究算法和学习算法的同学，或者一些初学者而言，即使按照教程将神经网络搭建出来了，再进一步，将图片推理出来了，依旧是云里雾里，不知其原理，始终浮于表面，心里不踏实。
+
 nn.conv2d 的调用将conv2d的实现封装起来了，看不到，很难学到里面的实现细节，跟别提如何在此基础上进行性能优化了。
 
 于是我突发奇想，所有的代码全部自己写，便有了很大的自由度，可以十分方便的对神经网络进行优化（魔改），在确保精度的前提在，获取最好的性能。
@@ -214,7 +217,7 @@ $ cat /proc/cpuinfo
 
 模型参数的提前加载可以最大限度的减轻系统的IO压力，减少时延。
 
-重点优化修改查看：[PreLoad](https://github.com/dongtuoc/resnet50_zero/blob/main/cpp/3rd_version_avx2_reload/resnet_avx2_preload.h#L263)，可查看[实现](https://github.com/dongtuoc/resnet50_zero/blob/main/cpp/3rd_version_avx2_reload/resnet_avx2_preload.h)中所有带有 **PRE_LOAD_PARAM** 的地方。
+重点优化修改查看：[PreLoad](https://github.com/dongtuoc/resnet50_zero/blob/main/cpp/3rd_version_avx2_preload/resnet_avx2_preload.h#L263)，可查看[实现](https://github.com/dongtuoc/resnet50_zero/blob/main/cpp/3rd_version_avx2_preload/resnet_avx2_preload.h)中所有带有 **PRE_LOAD_PARAM** 的地方。
 
 这一版加入了平均时延(Latency)的统计，以及吞吐量(Throughput)的计算。
 
