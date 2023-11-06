@@ -10,10 +10,10 @@
 #include <vector>
 
 #include "../label.h"
-#include "resnet_avx2_preload.h"
+#include "./resnet_codegen.h"
 
-static std::vector<std::string> GetFileName() {
-  std::vector<std::string> filenames;
+static std::map<std::string, int> GetFileName() {
+  std::map<std::string, int> res;
   std::string dir_path("../../pics/ani_12/");
   // filenames.push_back(dir_path + std::string("Niu.jpg"));
   // return filenames;
@@ -23,21 +23,55 @@ static std::vector<std::string> GetFileName() {
     exit(0);
   }
   dirent* entry;
+  std::vector<std::string> filenames;
   while ((entry = readdir(dir)) != nullptr) {
     if (entry->d_type == DT_REG) {
       filenames.push_back(dir_path + std::string(entry->d_name));
     }
   }
   closedir(dir);
-  std::cout << "Read Files:" << std::endl;
+
+  int label = 0;
   for (const auto& filename : filenames) {
-    std::cout << filename << std::endl;
+    if (filename == "../../pics/ani_12/LaoHu.jpg") {
+      label = 292;
+    } else if (filename == "../../pics/ani_12/Ji.jpg") {
+      label = 7;
+    } else if (filename == "../../pics/ani_12/HouZi.jpg") {
+      label = 373;
+    } else if (filename == "../../pics/ani_12/TuZi.jpg") {
+      label = 282;
+    } else if (filename == "../../pics/ani_12/Yang.jpg") {
+      label = 348;
+    } else if (filename == "../../pics/ani_12/Niu.jpg") {
+      label = 345;
+    } else if (filename == "../../pics/ani_12/LaoShu.jpg") {
+      label = 367;
+    } else if (filename == "../../pics/ani_12/Ma.jpg") {
+      label = 268;
+    } else if (filename == "../../pics/ani_12/Zhu.jpg") {
+      label = 341;
+    } else if (filename == "../../pics/ani_12/Long.jpg") {
+      label = 39;
+    } else if (filename == "../../pics/ani_12/Gou.jpg") {
+      label = 258;
+    } else if (filename == "../../pics/ani_12/She.jpg") {
+      label = 53;
+    } else {
+      std::cout << "No Golden Label for " << filename << std::endl;
+    }
+    res[filename] = label;
+  }
+
+  std::cout << "Read Files:" << std::endl;
+  for (auto it : res) {
+    std::cout << it.first << ", lable: " << it.second << std::endl;
   }
   std::cout << "\n\n" << std::endl;
-  return filenames;
+  return res;
 }
 
-static float* PreProcess(const std::string& file_name) {
+static void PreProcess(const std::string& file_name, void* out) {
   auto transpose2d = [](uint8_t* src, uint8_t* dst) {
     memcpy(dst, src, 224 * 224 * 3);
     return;
@@ -60,7 +94,7 @@ static float* PreProcess(const std::string& file_name) {
     exit(0);
   };
 
-  float* mat_data = (float*)malloc(224 * 224 * 3 * sizeof(float));
+  float* mat_data = (float*)out;
   cv::Mat source_o, img_o, img_r;
   source_o = cv::imread(file_name);
   cv::cvtColor(source_o, img_o, cv::COLOR_BGR2RGB);
@@ -81,10 +115,11 @@ static float* PreProcess(const std::string& file_name) {
           ((trans_data[i * 224 * 3 + j * 3 + 2] / 255.0) - 0.406) / 0.225;  // B
     }
   }
-  return mat_data;
+  free(trans_data);
 }
 
-void ShowResult(float* res) {
+int ShowResult(void* res0) {
+  float* res = (float*)res0;
   int n_ele = 1000;
   std::vector<std::pair<float, int>> sort_pairs;
   for (int i = 0; i < n_ele; ++i) {
@@ -95,14 +130,14 @@ void ShowResult(float* res) {
               return a.first > b.first;
             });
   auto labels = load_imagenet_labels();
-  const int topk = 5;
+  const int topk = 1;
   std::cout << ">>> Result:" << std::endl;
   for (int i = 0; i < topk; ++i) {
     std::cout << "top " << (i + 1) << " " << sort_pairs[i].first << " -> Index=["
               << sort_pairs[i].second << "]"
               << ", Label=[" << labels[sort_pairs[i].second] << "]" << std::endl;
-    ;
   }
+  return sort_pairs[0].second;
 }
 
 int GetTime() {
@@ -113,59 +148,46 @@ int GetTime() {
 }
 
 int main() {
+  void* __global_mem_main0 = malloc(8 * 1024 * 1024);
+  void* __global_mem_main1 = malloc(8 * 1024 * 1024);
+  void* __global_mem_temp = malloc(8 * 1024 * 1024);
+
+  // preload weight/bias to memory
   PreLoadParams();
-  const auto& files = GetFileName();
+  // warm up the inference routies, fix the addr for all memory and cal-offset
+  WarmUp(__global_mem_main0, __global_mem_main1, __global_mem_temp);
+
   int total_time = 0;
+  const auto& files = GetFileName();
   for (auto it : files) {
-    std::cout << "\nBegin to predict : " << it << std::endl;
-    auto img = PreProcess(it);
+    std::cout << "\nBegin to predict : " << it.first << std::endl;
+    PreProcess(it.first, __global_mem_main0);
 
+    // inference start
     int start = GetTime();
-
-    int h0, w0, c0;
-    int h1, w1, c1;
-    img = ComputeLayerConv2d<false>(img, 224, 224, h1, w1, c1, "conv1");
-    img = ComputeLayerBatchNorm<false>(img, h1, w1, c1, "bn1");
-    img = ComputeLayerRelu<false>(img, h1 * w1 * c1);
-    img = ComputeLayerMaxPool<false>(img);
-    // layer1
-    img = ComputeBottleNeck<false>(img, 56, 56, h1, w1, c1, "layer1_bottleneck0", true);
-    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer1_bottleneck1", false);
-    img = ComputeBottleNeck<false>(img, h0, w0, h1, w1, c1, "layer1_bottleneck2", false);
-    // layer2
-    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer2_bottleneck0", true);
-    img = ComputeBottleNeck<false>(img, h0, w0, h1, w1, c1, "layer2_bottleneck1", false);
-    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer2_bottleneck2", false);
-    img = ComputeBottleNeck<false>(img, h0, w0, h1, w1, c1, "layer2_bottleneck3", false);
-    // layer3
-    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer3_bottleneck0", true);
-    img = ComputeBottleNeck<false>(img, h0, w0, h1, w1, c1, "layer3_bottleneck1", false);
-    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer3_bottleneck2", false);
-    img = ComputeBottleNeck<false>(img, h0, w0, h1, w1, c1, "layer3_bottleneck3", false);
-    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer3_bottleneck4", false);
-    img = ComputeBottleNeck<false>(img, h0, w0, h1, w1, c1, "layer3_bottleneck5", false);
-    // layer4
-    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer4_bottleneck0", true);
-    img = ComputeBottleNeck<false>(img, h0, w0, h1, w1, c1, "layer4_bottleneck1", false);
-    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer4_bottleneck2", false);
-    // avg pool
-    img = ComputeLayerAvgPool<false>(img);
-    // Linear
-    img = ComputeLayerFC<false>(img, "fc");
-
+    Infer(__global_mem_main0, __global_mem_main1, __global_mem_temp);
     int end = GetTime();
-    int time = end - start;
-    total_time += time;
-    ShowResult(img);
+    // inference done
 
-    std::cout << "Time cost : " << time << " ms.\n" << std::endl;
-    free(img);
+    int res_label = ShowResult(__global_mem_main1);
+    if (res_label == it.second) {
+      std::cout << "\033[0;32mInference Result Succ \033[0m" << std::endl;
+    } else {
+      std::cout << "\033[0;31mInference Result Fail: Golden Label: " << it.second
+                << ", Res Lable: " << res_label << "\033[0m" << std::endl;
+    }
+    std::cout << "\033[0;32mTime cost : " << end - start << " ms.\033[0m\n" << std::endl;
+    total_time += (end - start);
   }
   float latency = (float)(total_time) / (float)(files.size());
   std::cout << "\033[0;32mAverage Latency : " << latency << "ms \033[0m" << std::endl;
   std::cout << "\033[0;32mAverage Throughput : " << (1000 / latency) << "fps \033[0m" << std::endl;
-  for (auto it : __global_params) {
-    free(it.second);
+  for (int i = 0; i < MAX_MEM_NUM; i++) {
+    if (__global_weight[i] != nullptr) free(__global_weight[i]);
   }
+  free(__global_mem_main0);
+  free(__global_mem_main1);
+  free(__global_mem_temp);
+
   return 0;
 }

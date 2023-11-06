@@ -285,11 +285,25 @@ conv, bn, relu, add, maxpool, avgpool 的算法都已经开发完成，按照模
 
 ### 2023-11-03
 
+Average Latency: 800 ms
+ThroughPut: 1.25 fps
+
 终于有时间再来维护一下这个仓库了，看到有一些小伙伴星标了本仓库，感谢，如果您在看，也请您动动小手手星标一下吧。
 
 今天利用类内存池的东西，将权值做了提前加载，推理时延终于降到了1s以下，平均800ms。
 
 但是，还有不规范的地方在于，每一层输入输出的内存还是采用动态申请的方式，这一点是不能忍的，因为在实际项目中，整个推理过程，是不允许和操作系统做这种 malloc 行为，所以下一步会把所有的推理路径上的 malloc 动作全部干掉，性能应该还能再上一大截。
+
+### 2023-11-05
+
+Average Latency: 608 ms
+ThroughPut: 1.64 fps
+
+已是晚上12点，重构了部分代码逻辑，终于又提升了1/4。
+将整个推理路径上的 malloc 全部删除， std::map 替换成栈数组，删除所有与推理无关的字符串操作。
+启用 avx2 中的累加指令完成 conv2d 和 Fc 中的乘累加操作。
+增加结果校验，确保结果正确。
+版本见：[cpp 优化第四版](https://github.com/dongtuoc/resnet50_zero/tree/main/cpp/4th_version_avx2_preload_noMalloc)。
 
 
 ---
