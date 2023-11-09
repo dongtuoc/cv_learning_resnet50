@@ -157,15 +157,22 @@ int main() {
   // warm up the inference routies, fix the addr for all memory and cal-offset
   WarmUp(__global_mem_main0, __global_mem_main1, __global_mem_temp);
 
-  int total_time = 0;
   const auto& files = GetFileName();
+
+#if CODE_GEN
+  // GenCode
+  PreProcess(files.begin()->first, __global_mem_main0);
+  CodeGen(__global_mem_main0, __global_mem_main1, __global_mem_temp);
+#endif
+
+  int total_time = 0;
   for (auto it : files) {
     std::cout << "\nBegin to predict : " << it.first << std::endl;
     PreProcess(it.first, __global_mem_main0);
 
     // inference start
     int start = GetTime();
-    Infer(__global_mem_main0, __global_mem_main1, __global_mem_temp);
+    CodeGen(__global_mem_main0, __global_mem_main1, __global_mem_temp);
     int end = GetTime();
     // inference done
 
