@@ -338,6 +338,7 @@ $ pip3 install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 - 如果你感兴趣，可以联系我，一起维护本仓库，你可以按照自己的想法来优化一些算法和性能，只要有效果，都十分欢迎。
 - 本项目所有代码和所列的所有的文章，均为我个人原创，未经同意，请勿随意转载至任何平台，更不可用于商业目的，我已委托相关维权人士对我的原创文章和代码进行监督。
 - 如果你有其他相关事宜，欢迎和我交流。
+- 最近我开通了一个专栏: 计算机视觉从入门到调优，如果你感兴趣可以查看一下，传送门：[CV视觉从入门到调优](https://mp.weixin.qq.com/s?__biz=MzAwOTc2NDU3OQ==&mid=2649037889&idx=1&sn=92e8e60fbe5db2bed5fbf3565fbdfcd9&chksm=834b17cdb43c9edbf6467251c9c0f5f9a9f3d73efa1c15fc1941f6a1c5a87a5612fdbfe04e68&token=1550943707&lang=zh_CN#rd)
 
 ---
 ## 愿 resnet50 这一神经网络，对所有人都不是难题
