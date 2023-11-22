@@ -163,6 +163,7 @@ int main() {
   // GenCode
   PreProcess(files.begin()->first, __global_mem_main0);
   CodeGen(__global_mem_main0, __global_mem_main1, __global_mem_temp);
+  return 0;
 #endif
 
   int total_time = 0;
