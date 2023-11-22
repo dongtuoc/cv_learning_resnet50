@@ -70,7 +70,8 @@ nn.conv2d 的调用将conv2d的实现封装起来了，看不到，很难学到�
 - [4 利用 torch来debug，识别出了萨摩耶](https://mp.weixin.qq.com/s/YvUSh5UpUxq0eCIvsybDBQ)
 - [5 我完全手写的算法和网络，识别出了虎猫](https://mp.weixin.qq.com/s/jHlTWt-pH4glmtTP6pcKFw)
 - [6 大提速，分分钟识别“十二生肖”](https://mp.weixin.qq.com/s/8ym0bRR-miASQmbZmfvuag)
-- 未完待续。
+- note: 以上文章有些由于感觉写的不太好，已经被删除，目前正在打磨一个小册，会将上述所有文章重新撰写，包括这个仓库的代码解析。
+- note: 小册传送门：[CV视觉从入门到调优](https://mp.weixin.qq.com/s?__biz=MzAwOTc2NDU3OQ==&mid=2649037889&idx=1&sn=92e8e60fbe5db2bed5fbf3565fbdfcd9&chksm=834b17cdb43c9edbf6467251c9c0f5f9a9f3d73efa1c15fc1941f6a1c5a87a5612fdbfe04e68&token=1550943707&lang=zh_CN#rd)
 
 
 ---
