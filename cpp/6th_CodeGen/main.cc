@@ -1,4 +1,5 @@
 #include <dirent.h>
+#include <dlfcn.h>
 
 #include <chrono>
 #include <cmath>
@@ -152,20 +153,40 @@ int main() {
   void* __global_mem_main1 = malloc(8 * 1024 * 1024);
   void* __global_mem_temp = malloc(8 * 1024 * 1024);
 
-  // preload weight/bias to memory
+  // Preload weight, bias and other params of module to memory
   PreLoadParams();
-  // warm up the inference routies, fix the addr for all memory and cal-offset
+  // Warm up the inference routies
+  // 1. fix the input and output for all layers
   WarmUp(__global_mem_main0, __global_mem_main1, __global_mem_temp);
-
+  // Get the files(pictures) for inference
   const auto& files = GetFileName();
 
 #if CODE_GEN
-  // GenCode
-  PreProcess(files.begin()->first, __global_mem_main0);
+  // Once the input/output address of all layers are fixed, and the
+  // params of all layers are determined, we can generate a `const` code
+  // which have a better performence due to the following reasons.
+  // 1. Uncessary calulating for all intermediate data and params is removed.
+  // 2. All weight/bias/OtherParams are fixed to a determined address.
+  //
+  // CodeGen function will generate a `libcodegen.so` under ./lib/ directory.
   CodeGen(__global_mem_main0, __global_mem_main1, __global_mem_temp);
-  return 0;
+
+  void* handle = dlopen("./lib/libcodegen.so", RTLD_LAZY);
+  if (!handle) {
+    printf("Error dlopen.\n");
+    return 0;
+  }
+  typedef void (*Func)(void*, void*, void*);
+  auto myFunc = (Func)dlsym(handle, "_Z14InferByCodeGenPvS_S_");
+  if (!myFunc) {
+    printf("Error dlsym.\n");
+    return 0;
+  } else {
+    printf("Succ get Codegen Func\n");
+  }
 #endif
 
+  // Begin to Predict the Pictures.
   int total_time = 0;
   for (auto it : files) {
     std::cout << "\nBegin to predict : " << it.first << std::endl;
@@ -173,7 +194,7 @@ int main() {
 
     // inference start
     int start = GetTime();
-    CodeGen(__global_mem_main0, __global_mem_main1, __global_mem_temp);
+    myFunc(__global_mem_main0, __global_mem_main1, __global_mem_temp);
     int end = GetTime();
     // inference done
 
@@ -190,6 +211,7 @@ int main() {
   float latency = (float)(total_time) / (float)(files.size());
   std::cout << "\033[0;32mAverage Latency : " << latency << "ms \033[0m" << std::endl;
   std::cout << "\033[0;32mAverage Throughput : " << (1000 / latency) << "fps \033[0m" << std::endl;
+
   for (int i = 0; i < MAX_MEM_NUM; i++) {
     if (__global_weight[i] != nullptr) free(__global_weight[i]);
   }

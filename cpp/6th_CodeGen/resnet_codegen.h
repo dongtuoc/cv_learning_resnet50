@@ -217,7 +217,7 @@ static void MyConv2d(void* img_in,
 static void MyFullyConnectInfer(void* img_in, void* img_out, float* weight, float* bias) {
 #if CODE_GEN
   std::ostringstream fc_os;
-  fc_os << "static void MyFullyConnectInfer(void* img_in, void* img_out, float* weight, float* "
+  fc_os << "void MyFullyConnectInfer(void* img_in, void* img_out, float* weight, float* "
            "bias)\n"
            "{\n";
   // fc_os << "float* img = (float*)img_in;\n";
@@ -290,7 +290,7 @@ std::vector<int> __globle_maxpool_output_idx;
 static void MyMaxPoolInfer(void* img_in, void* img_out) {
 #if CODE_GEN
   std::ostringstream maxpool_os;
-  maxpool_os << "static void MyMaxPoolInfer(void* img_in, void* img_out) {\n";
+  maxpool_os << "void MyMaxPoolInfer(void* img_in, void* img_out) {\n";
   maxpool_os << "  float* img = (float*)img_in;\n";
   maxpool_os << "  float* out = (float*)img_out;\n";
 #endif
@@ -379,7 +379,7 @@ std::vector<int> __globle_avgpool_output_idx;
 static void MyAvgPoolInfer(void* img_in, void* img_out) {
 #if CODE_GEN
   std::ostringstream avgpool_os;
-  avgpool_os << "static void MyAvgPoolInfer(void* img_in, void* img_out) {\n";
+  avgpool_os << "void MyAvgPoolInfer(void* img_in, void* img_out) {\n";
   avgpool_os << "  float* img = (float*)img_in;\n";
   avgpool_os << "  float* out = (float*)img_out;\n";
 #endif
@@ -474,7 +474,7 @@ static void MyBatchNormInfer(
   float* out = (float*)img_out;
 #if CODE_GEN
   std::ostringstream bn_os;
-  bn_os << "static void MyBatchNormInfer_" << bn_cnt << "(\n";
+  bn_os << "void MyBatchNormInfer_" << bn_cnt << "(\n";
   bn_os
       << "    void* img_in, void* img_out, float* mean, float* var, float* gamma, float* bias) {\n";
   bn_os << "  float* img = (float*)img_in;\n";
@@ -556,7 +556,7 @@ int relu_cnt = 0;
 static void InferLayerRelu(void* img_in) {
 #if CODE_GEN
   std::ostringstream relu_os;
-  relu_os << "static void InferLayerRelu_" << relu_cnt << "(void* img_in) {\n";
+  relu_os << "void InferLayerRelu_" << relu_cnt << "(void* img_in) {\n";
   relu_os << "  const auto& len = " << __globle_relu_in_out_len[relu_cnt] << ";\n";
   relu_os << "  float* img = (float*)img_in;\n";
   relu_os << "  for (int i = 0; i < len; ++i) {\n";
@@ -642,7 +642,7 @@ static void InferLayerConv2d(void* img_in, void* img_out) {
   std::ostringstream imp_os;
   std::ostringstream dec_os;
   dec_os << "void InferLayerConv2d_" << conv_idx << "(void* img_in, void* img_out);\n";
-  imp_os << "static void InferLayerConv2d_" << conv_idx << "(void* img_in, void* img_out) {\n";
+  imp_os << "void InferLayerConv2d_" << conv_idx << "(void* img_in, void* img_out) {\n";
   imp_os << "  MyConv2dInfer_" << conv_idx << "(img_in, img_out, (float *)" << weight << ");\n";
   imp_os << "}\n";
   const std::string fi = "lib/conv_" + std::to_string(conv_idx) + ".cc";
@@ -681,7 +681,7 @@ static void InferLayerFC(void* img_in, void* img_out) {
 
 #if CODE_GEN
   std::ostringstream fc_os;
-  fc_os << "static void InferLayerFC(void* img_in, void* img_out) {\n";
+  fc_os << "void InferLayerFC(void* img_in, void* img_out) {\n";
   fc_os << "  MyFullyConnectInfer(img_in, img_out, (float *)" << weight << ", (float *)" << bias
         << ");\n";
   fc_os << "}\n";
@@ -713,8 +713,7 @@ static void InferLayerBatchNorm(void* in_data, void* out_data) {
 
 #if CODE_GEN
   std::ostringstream bn_os;
-  bn_os << "static void InferLayerBatchNorm_" << bn_cnt - 1
-        << "(void* in_data, void* out_data) {\n";
+  bn_os << "void InferLayerBatchNorm_" << bn_cnt - 1 << "(void* in_data, void* out_data) {\n";
   bn_os << "  MyBatchNormInfer_" << bn_cnt - 1 << "(in_data, out_data, (float *)" << mean
         << ", (float *)" << var << ", (float *)" << gamma << ", (float *)" << bias << ");\n";
   bn_os << "}\n";
@@ -751,7 +750,7 @@ static void InferLayerMaxPool(void* in_data, void* out_data) {
 
 #if CODE_GEN
   std::ostringstream maxpool_os;
-  maxpool_os << "static void InferLayerMaxPool(void* in_data, void* out_data) {\n";
+  maxpool_os << "void InferLayerMaxPool(void* in_data, void* out_data) {\n";
   maxpool_os << "  MyMaxPoolInfer(in_data, out_data);\n";
   maxpool_os << "}\n";
   write("lib/maxpool.h", maxpool_os);
@@ -772,7 +771,7 @@ static void InferLayerAvgPool(void* in_data, void* out_data) {
 
 #if CODE_GEN
   std::ostringstream avgpool_os;
-  avgpool_os << "static void InferLayerAvgPool(void* in_data, void* out_data) {\n";
+  avgpool_os << "void InferLayerAvgPool(void* in_data, void* out_data) {\n";
   avgpool_os << "  MyAvgPoolInfer(in_data, out_data);\n";
   avgpool_os << "};\n";
   write("lib/avgpool.h", avgpool_os);
@@ -794,18 +793,22 @@ int add_cnt = 0;
 static void InferLayerAdd(float* l, float* r, float* out) {
 #if CODE_GEN
   std::ostringstream add_os;
-  add_os << "static void InferLayerAdd_" << add_cnt << "(float* l, float* r, float* out) {\n";
-  // add_os << "  const auto& len = " << __globle_add_in_out_len[add_cnt] << ";\n";
-  // add_os << "  const int vec_size = 8;\n";
-  // add_os << "  __m256 l_vec, r_vec, res_vec;\n";
-  // add_os << "  for (int i = 0; i < len; i += vec_size) {\n";
-  // add_os << "    l_vec = _mm256_loadu_ps(l + i);\n";
-  // add_os << "    r_vec = _mm256_loadu_ps(r + i);\n";
-  // add_os << "    res_vec = _mm256_add_ps(l_vec, r_vec);\n";
-  // add_os << "    _mm256_storeu_ps(out + i, res_vec);\n";
-  // add_os << "  }\n";
+  std::ostringstream hadd_os;
+  hadd_os << "void InferLayerAdd_" << add_cnt << "(float* l, float* r, float* out);\n";
+  add_os << "#include <immintrin.h>\n";
+  add_os << " void InferLayerAdd_" << add_cnt << "(float* l, float* r, float* out) {\n";
+  add_os << "  const auto& len = " << __globle_add_in_out_len[add_cnt] << ";\n";
+  add_os << "  const int vec_size = 8;\n";
+  add_os << "  __m256 l_vec, r_vec, res_vec;\n";
+  add_os << "  for (int i = 0; i < len; i += vec_size) {\n";
+  add_os << "    l_vec = _mm256_loadu_ps(l + i);\n";
+  add_os << "    r_vec = _mm256_loadu_ps(r + i);\n";
+  add_os << "    res_vec = _mm256_add_ps(l_vec, r_vec);\n";
+  add_os << "    _mm256_storeu_ps(out + i, res_vec);\n";
+  add_os << "  }\n";
   add_os << "}\n";
-  write("lib/add.h", add_os);
+  write("lib/add.h", hadd_os);
+  write("lib/add.cc", add_os);
 #endif
 
   const auto& len = __globle_add_in_out_len[add_cnt];
@@ -866,7 +869,7 @@ static void InferBottleNeck(void* in_data, void* out_data, void* temp_data, bool
 
 #if CODE_GEN
   std::ostringstream bottle_os;
-  bottle_os << "static void InferBottleNeck_" << bottle_idx
+  bottle_os << "void InferBottleNeck_" << bottle_idx
             << "(void* in_data, void* out_data, void* temp_data, bool down_sample) {\n";
   bottle_os << "  InferLayerConv2d_" << this_conv_idx++ << "(in_data, out_data);\n";
   bottle_os << "  InferLayerBatchNorm_" << this_bn_idx++ << "(out_data, temp_data);\n";
@@ -1122,7 +1125,7 @@ void CodeGen(void* mem_main0, void* mem_main1, void* mem_temp) {
   InferLayerFC(mem_main0, mem_main1);
 
 #if CODE_GEN
-  header_os << "void CodeGen(void* mem_main0, void* mem_main1, void* mem_temp) {\n";
+  header_os << "void InferByCodeGen(void* mem_main0, void* mem_main1, void* mem_temp) {\n";
   header_os << "  InferLayerConv2d_0(mem_main0, mem_main1);\n";
   header_os << "  InferLayerBatchNorm_0(mem_main1, mem_main0);\n";
   header_os << "  InferLayerRelu_0(mem_main0);\n";
@@ -1166,8 +1169,9 @@ void CodeGen(void* mem_main0, void* mem_main1, void* mem_temp) {
   }
 
   cmd +=
-      "g++ -shared -fPIC -I/usr/include/opencv4 -lopencv_core -lopencv_imgproc -lopencv_highgui "
-      "-lopencv_imgcodecs -o libcodegen.so codegen.cc ";
+      "g++ -mavx -shared -fPIC -I/usr/include/opencv4 -lopencv_core -lopencv_imgproc "
+      "-lopencv_highgui "
+      "-lopencv_imgcodecs -o libcodegen.so codegen.cc add.cc ";
   for (int i = 0; i < 53; i++) {
     cmd += "conv_" + std::to_string(i) + ".o ";
   }
