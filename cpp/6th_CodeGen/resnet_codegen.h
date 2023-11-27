@@ -72,13 +72,6 @@ static void MyConv2dInfer(void* img_in, void* img_out, float* weight) {
   int stride = param[7];
   int kernel = param[8];
 
-  // imp_os << "auto mac = [](float *img, float *weight, int* c_idx, int* w_idx, int len) -> float
-  // {\n"; imp_os << "  float acc = 0;\n"; imp_os << "  for (auto idx = 0; idx < len; ++idx) {\n";
-  // imp_os << "    acc += img[c_idx[idx]] * weight[w_idx[idx]];\n";
-  // imp_os << "  }\n";
-  // imp_os << "  return acc;\n";
-  // imp_os << "};\n";
-
   imp_os << "  for (int co_idx = 0; co_idx < " << co << "; co_idx++) {\n";
   imp_os << "    int co_idx_for_cal = co_idx * " << kernel * kernel * ci << ";\n";
   imp_os << "    for (int ho_idx = 0; ho_idx < " << ho << "; ho_idx++) {\n";
@@ -87,8 +80,10 @@ static void MyConv2dInfer(void* img_in, void* img_out, float* weight) {
   imp_os << "        const int in_w_origin = wo_idx * " << stride << " - " << pad << ";\n";
   imp_os << "        const int filter_h_start = std::max(0, -in_h_origin);\n";
   imp_os << "        const int filter_w_start = std::max(0, -in_w_origin);\n";
-  imp_os << "        const int filter_h_end = std::min(" << kernel << ", " << hi << " - in_h_origin);\n";
-  imp_os << "        const int filter_w_end = std::min(" << kernel << ", " << wi << " - in_w_origin);\n";
+  imp_os << "        const int filter_h_end = std::min(" << kernel << ", " << hi
+         << " - in_h_origin);\n";
+  imp_os << "        const int filter_w_end = std::min(" << kernel << ", " << wi
+         << " - in_w_origin);\n";
   imp_os << "        register float acc = 0;\n";
   if (conv_idx == 0) {
     imp_os << "        for (int kh_idx = filter_h_start; kh_idx < filter_h_end; kh_idx++) {\n";
@@ -97,7 +92,8 @@ static void MyConv2dInfer(void* img_in, void* img_out, float* weight) {
     imp_os << "            const int wi_index = in_w_origin + kw_idx;\n";
     imp_os << "            for (int ci_ = 0; ci_ < 3; ci_++) {\n";
     imp_os << "              auto in_data = img[hi_index * 224 * 3 + wi_index * 3 + ci_];\n";
-    imp_os << "              auto weight_data = weight[co_idx * 49 * 3 + kh_idx * 7 * 3 + kw_idx * 3 + ci_];\n";
+    imp_os << "              auto weight_data = weight[co_idx * 49 * 3 + kh_idx * 7 * 3 + kw_idx * "
+              "3 + ci_];\n";
     imp_os << "              acc += in_data * weight_data;\n";
     imp_os << "            }\n";
     imp_os << "          }\n";
@@ -112,9 +108,12 @@ static void MyConv2dInfer(void* img_in, void* img_out, float* weight) {
     imp_os << "            // Load input and weight data into vectors\n";
     imp_os << "            __m256 in_vec, weight_vec;\n";
     imp_os << "            for (int ci_ = 0; ci_ < " << ci << "; ci_ += vec_size) {\n";
-    imp_os << "              in_vec = _mm256_loadu_ps(&img[hi_index * " << wi * ci << " + wi_index * " << ci << " + ci_]);\n";
-    imp_os << "              weight_vec = _mm256_loadu_ps(&weight[co_idx * " << kernel * kernel * ci << " +\n";
-    imp_os << "                                                   kh_idx * " << kernel * ci << " + kw_idx * " << ci << " + ci_]);\n";
+    imp_os << "              in_vec = _mm256_loadu_ps(&img[hi_index * " << wi * ci
+           << " + wi_index * " << ci << " + ci_]);\n";
+    imp_os << "              weight_vec = _mm256_loadu_ps(&weight[co_idx * " << kernel * kernel * ci
+           << " +\n";
+    imp_os << "                                                   kh_idx * " << kernel * ci
+           << " + kw_idx * " << ci << " + ci_]);\n";
     imp_os << "              in_vec = _mm256_mul_ps(in_vec, weight_vec);\n";
     imp_os << "              // Add the elements of the accumulator vector and store the result\n";
     imp_os << "              acc += avx2_sum(in_vec);\n";
@@ -126,6 +125,11 @@ static void MyConv2dInfer(void* img_in, void* img_out, float* weight) {
   imp_os << "      }\n";
   imp_os << "    }\n";
   imp_os << "  }\n";
+  imp_os << "}\n";
+  const std::string fi = "lib/conv_" + std::to_string(conv_idx) + ".cc";
+  const std::string fd = "lib/conv_" + std::to_string(conv_idx) + ".h";
+  write(fi, imp_os);
+  write(fd, dec_os);
 
 #endif
 
@@ -140,37 +144,14 @@ static void MyConv2dInfer(void* img_in, void* img_out, float* weight) {
   for (int i = 0; i < this_conv_loop; ++i) {
     const auto& channel = this_conv_input[i];
     const auto& weight_ii = this_conv_weight[i];
-#if CODE_GEN
-    // imp_os << "{\n";
-    // PrintVec(imp_os, channel, "channel");
-    // PrintVec(imp_os, weight_ii, "weight_ii");
-    // imp_os << "float acc = 0;\n";
-#endif
 
     float acc = 0;
     const int& channel_size = channel.size();
     if (conv_idx == 0) {
-#if CODE_GEN
-      // imp_os << "for (auto idx = 0; idx <" << channel_size << "; ++idx) {\n";
-      // imp_os << "  acc += img[channel[idx]] * weight[weight_ii[idx]];\n";
-      // imp_os << "}\n";
-      // imp_os << "out[" << this_conv_out[i] << "] = mac(img, weight, channel, weight_ii, " <<
-      // channel_size << ");\n";
-#endif
       for (auto idx = 0; idx < channel_size; ++idx) {
         acc += img[channel[idx]] * weight[weight_ii[idx]];
       }
     } else {
-#if CODE_GEN
-      //   imp_os << "__m256 in_vec, weight_vec;";
-      //   imp_os << "for (auto idx = 0; idx < " << channel_size << "; idx ++) {\n";
-      //   imp_os << "in_vec = _mm256_loadu_ps(&img[channel[idx]]);\n";
-      //   imp_os << "weight_vec = _mm256_loadu_ps(&weight[weight_ii[idx]]);\n";
-      //   imp_os << "in_vec = _mm256_mul_ps(in_vec, weight_vec);\n";
-      //   imp_os << "acc += avx2_sum(in_vec);\n";
-      //   imp_os << "}\n";
-#endif
-
       __m256 in_vec, weight_vec;
       for (auto idx = 0; idx < channel_size; ++idx) {
         in_vec = _mm256_loadu_ps(&img[channel[idx]]);
@@ -181,18 +162,7 @@ static void MyConv2dInfer(void* img_in, void* img_out, float* weight) {
       }
     }
     out[this_conv_out[i]] = acc;
-#if CODE_GEN
-    // imp_os << "out[" << this_conv_out[i] << "] = acc;\n";
-    // imp_os << "}";
-#endif
   }
-#if CODE_GEN
-  imp_os << "}\n";
-  const std::string fi = "lib/conv_" + std::to_string(conv_idx) + ".cc";
-  const std::string fd = "lib/conv_" + std::to_string(conv_idx) + ".h";
-  write(fi, imp_os);
-  write(fd, dec_os);
-#endif
 }
 
 template <bool PRE_LOAD_PARAM, bool WARM_UP_FOR_INFER>
@@ -295,7 +265,8 @@ static void MyFullyConnectInfer(void* img_in, void* img_out, float* weight, floa
   std::ostringstream hfc_os;
   std::ostringstream fc_os;
   hfc_os << "void MyFullyConnectInfer(void* img_in, void* img_out, float* weight, float* "
-           "bias);\n";
+            "bias);\n";
+  fc_os << "#include \"func.h\"\n";
   fc_os << "void MyFullyConnectInfer(void* img_in, void* img_out, float* weight, float* "
            "bias) {\n";
   fc_os << "  float* img = (float*)img_in;\n";
@@ -375,6 +346,32 @@ static void MyMaxPoolInfer(void* img_in, void* img_out) {
   maxpool_os << "void MyMaxPoolInfer(void* img_in, void* img_out) {\n";
   maxpool_os << "  float* img = (float*)img_in;\n";
   maxpool_os << "  float* out = (float*)img_out;\n";
+  maxpool_os << "  for (auto c_ = 0; c_ < 64; c_++) {\n";
+  maxpool_os << "    for (auto ho_idx = 0; ho_idx < 56; ho_idx++) {\n";
+  maxpool_os << "      int in_h_origin = ho_idx * 2 - 1;\n";
+  maxpool_os << "      for (auto wo_idx = 0; wo_idx < 56; wo_idx++) {\n";
+  maxpool_os << "        int in_w_origin = wo_idx * 2 - 1;\n";
+  maxpool_os << "        auto filter_h_start = std::max(0, -in_h_origin);\n";
+  maxpool_os << "        auto filter_w_start = std::max(0, -in_w_origin);\n";
+  maxpool_os << "        auto filter_h_end = std::min(3, 112 - in_h_origin);\n";
+  maxpool_os << "        auto filter_w_end = std::min(3, 112 - in_w_origin);\n";
+  maxpool_os << "        float max_x = float(0);\n";
+  maxpool_os << "        for (auto kh_idx = filter_h_start; kh_idx < filter_h_end; kh_idx++) {\n";
+  maxpool_os << "          auto hi_index = in_h_origin + kh_idx;\n";
+  maxpool_os << "          for (auto kw_idx = filter_w_start; kw_idx < filter_w_end; kw_idx++) {\n";
+  maxpool_os << "            auto wi_index = in_w_origin + kw_idx;\n";
+  maxpool_os << "            auto in_data = img[hi_index * 112 * 64 + wi_index * 64 + c_];\n";
+  maxpool_os << "            max_x = std::max(in_data, max_x);\n";
+  maxpool_os << "          }\n";
+  maxpool_os << "        }\n";
+  maxpool_os << "        out[ho_idx * 56 * 64 + wo_idx * 64 + c_] = max_x;\n";
+  maxpool_os << "      }\n";
+  maxpool_os << "    }\n";
+  maxpool_os << "  }\n";
+  maxpool_os << "}\n";
+
+  write("lib/maxpool.h", hmaxpool_os);
+  write("lib/maxpool.cc", maxpool_os);
 #endif
 
   float* img = (float*)img_in;
@@ -382,18 +379,6 @@ static void MyMaxPoolInfer(void* img_in, void* img_out) {
 
   for (int i = 0; i < __globle_maxpool_output_idx.size(); i++) {
     const auto& this_pool = __globle_maxpool_input_idx[i];
-#if CODE_GEN
-    // maxpool_os << "{\n";
-    // PrintVec(maxpool_os, this_pool, "this_pool");
-    // maxpool_os << "float max_x = float(0);\n";
-    // maxpool_os << "for (auto j = 0; j < " << this_pool.size() << "; j++) {\n";
-    // maxpool_os << "  auto in_data = img[this_pool[j]];\n";
-    // maxpool_os << "  max_x = std::max(in_data, max_x);\n";
-    // maxpool_os << "}\n";
-    // maxpool_os << "out[" << __globle_maxpool_output_idx[i] << "] = max_x;\n";
-    // maxpool_os << "}\n";
-#endif
-
     float max_x = float(0);
     for (auto j = 0; j < this_pool.size(); j++) {
       auto in_data = img[this_pool[j]];
@@ -401,12 +386,6 @@ static void MyMaxPoolInfer(void* img_in, void* img_out) {
     }
     out[__globle_maxpool_output_idx[i]] = max_x;
   }
-#if CODE_GEN
-  maxpool_os << "}\n";
-  const std::string fd = "lib/maxpool.h";
-  write("lib/maxpool.h", hmaxpool_os);
-  write("lib/maxpool.cc", maxpool_os);
-#endif
 }
 
 template <bool PRE_LOAD_PARAM, bool WARM_UP_FOR_INFER>
@@ -461,10 +440,42 @@ std::vector<int> __globle_avgpool_output_idx;
 
 static void MyAvgPoolInfer(void* img_in, void* img_out) {
 #if CODE_GEN
+  std::ostringstream havgpool_os;
   std::ostringstream avgpool_os;
+  havgpool_os << "void MyAvgPoolInfer(void* img_in, void* img_out);\n";
+  avgpool_os << "#include <algorithm>\n";
+  avgpool_os << "#include \"func.h\"\n";
   avgpool_os << "void MyAvgPoolInfer(void* img_in, void* img_out) {\n";
   avgpool_os << "  float* img = (float*)img_in;\n";
   avgpool_os << "  float* out = (float*)img_out;\n";
+  avgpool_os << "  for (auto c_ = 0; c_ < 2048; c_++) {\n";
+  avgpool_os << "    for (auto ho_idx = 0; ho_idx < 1; ho_idx++) {\n";
+  avgpool_os << "      int in_h_origin = ho_idx * 1 - 0;\n";
+  avgpool_os << "      for (auto wo_idx = 0; wo_idx < 1; wo_idx++) {\n";
+  avgpool_os << "        int in_w_origin = wo_idx * 1 - 0;\n";
+  avgpool_os << "        auto filter_h_start = std::max(0, -in_h_origin);\n";
+  avgpool_os << "        auto filter_w_start = std::max(0, -in_w_origin);\n";
+  avgpool_os << "        auto filter_h_end = std::min(7, 7 - in_h_origin);\n";
+  avgpool_os << "        auto filter_w_end = std::min(7, 7 - in_w_origin);\n";
+  avgpool_os << "        float sum = float(0);\n";
+  avgpool_os << "        int k_size = (filter_h_end - filter_h_start) * (filter_w_end - "
+                "filter_w_start);\n";
+  avgpool_os << "        for (auto kh_idx = filter_h_start; kh_idx < filter_h_end; kh_idx++) {\n";
+  avgpool_os << "          auto hi_index = in_h_origin + kh_idx;\n";
+  avgpool_os << "          for (auto kw_idx = filter_w_start; kw_idx < filter_w_end; kw_idx++) {\n";
+  avgpool_os << "            auto wi_index = in_w_origin + kw_idx;\n";
+  avgpool_os << "            auto in_data = img[hi_index * 7 * 2048 + wi_index * 2048 + c_];\n";
+  avgpool_os << "            sum += in_data;\n";
+  avgpool_os << "          }\n";
+  avgpool_os << "        }\n";
+  avgpool_os << "        out[ho_idx * 1 * 2048 + wo_idx * 2048 + c_] = sum / k_size;\n";
+  avgpool_os << "      }\n";
+  avgpool_os << "    }\n";
+  avgpool_os << "  }\n";
+  avgpool_os << "}\n";
+
+  write("lib/avgpool.h", havgpool_os);
+  write("lib/avgpool.cc", avgpool_os);
 #endif
 
   float* img = (float*)img_in;
@@ -473,29 +484,12 @@ static void MyAvgPoolInfer(void* img_in, void* img_out) {
   for (int i = 0; i < __globle_avgpool_output_idx.size(); i++) {
     const auto& this_pool = __globle_avgpool_input_idx[i];
     float sum = float(0);
-#if CODE_GEN
-    // avgpool_os << "{\n";
-    // PrintVec(avgpool_os, this_pool, "this_pool");
-    // avgpool_os << "float sum = float(0);\n";
-    // avgpool_os << "for (auto j = 0; j < " << this_pool.size() << "; j++) {\n";
-    // avgpool_os << "  auto in_data = img[this_pool[j]];\n";
-    // avgpool_os << "  sum += in_data;\n";
-    // avgpool_os << "}\n";
-    // avgpool_os << "out[" << __globle_avgpool_output_idx[i] << "] = "
-    //            << "sum / " << this_pool.size() << ";\n";
-    // avgpool_os << "}";
-#endif
     for (auto j = 0; j < this_pool.size(); j++) {
       auto in_data = img[this_pool[j]];
       sum += in_data;
     }
     out[__globle_avgpool_output_idx[i]] = sum / this_pool.size();
   }
-#if CODE_GEN
-  avgpool_os << "}";
-  const std::string fd = "lib/avgpool.h";
-  write(fd, avgpool_os);
-#endif
 }
 
 template <bool PRE_LOAD_PARAM, bool WARM_UP_FOR_INFER>
@@ -548,6 +542,7 @@ static void MyAvgPool(void* img_in, void* img_out) {
 }
 
 std::vector<std::vector<std::vector<int>>> __globle_bn_in_out_idx;
+std::vector<std::vector<int>> __globle_bn_params;
 int bn_cnt = 0;
 
 static void MyBatchNormInfer(
@@ -556,29 +551,37 @@ static void MyBatchNormInfer(
   float* out = (float*)img_out;
   const auto& this_bn_in_out = __globle_bn_in_out_idx[bn_cnt];
 #if CODE_GEN
+  auto param = __globle_bn_params[bn_cnt];
+  int h = param[0];
+  int w = param[1];
+  int c = param[2];
+  std::ostringstream hbn_os;
   std::ostringstream bn_os;
+  hbn_os << "void MyBatchNormInfer_" << bn_cnt << "(\n";
+  hbn_os
+      << "    void* img_in, void* img_out, float* mean, float* var, float* gamma, float* bias);\n";
+  bn_os << "#include <cmath>\n";
   bn_os << "void MyBatchNormInfer_" << bn_cnt << "(\n";
   bn_os
       << "    void* img_in, void* img_out, float* mean, float* var, float* gamma, float* bias) {\n";
-  // bn_os << "  float* img = (float*)img_in;\n";
-  // bn_os << "  float* out = (float*)img_out;\n";
-  // bn_os << "  for (int i = 0; i < " << this_bn_in_out.size() << "; i++) {\n";
-  // bn_os << "    auto m = mean[i];\n";
-  // bn_os << "    auto v = var[i];\n";
-  // bn_os << "    auto gm = gamma[i];\n";
-  // bn_os << "    auto bi = bias[i];\n";
-  // const auto& channel = this_bn_in_out[i];
-  // PrintVec(bn_os,  channel, "channel");
-  // bn_os << "    const float div = sqrt(v + 1e-5);\n";
-  // bn_os << "    for (auto idx = 0; idx < " << channel.size() << "; idx++) {\n";
-  // bn_os << "      auto data_ = (img[channel[idx]] - m) / div;\n";
-  // bn_os << "      data_ = data_ * gm + bi;\n";
-  // bn_os << "      out[channel[idx]] = data_;\n";
-  // bn_os << "    }\n";
-  // bn_os << "  }\n";
+  bn_os << "  float* img = (float*)img_in;\n";
+  bn_os << "  float* out = (float*)img_out;\n";
+  bn_os << "  for (auto c_ = 0; c_ < " << c << "; c_++) {\n";
+  bn_os << "    auto m = mean[c_];\n";
+  bn_os << "    auto v = var[c_];\n";
+  bn_os << "    auto gm = gamma[c_];\n";
+  bn_os << "    auto bi = bias[c_];\n";
+  bn_os << "    for (auto hw = 0; hw < " << h * w << "; hw++) {\n";
+  bn_os << "      auto data = img[hw * " << c << " + c_];\n";
+  bn_os << "      auto data_ = (data - m) / sqrt(v + 1e-5);\n";
+  bn_os << "      data_ = data_ * gm + bi;\n";
+  bn_os << "      out[hw * " << c << " + c_] = data_;\n";
+  bn_os << "    }\n";
+  bn_os << "  }\n";
   bn_os << "}\n";
-  std::string f = "lib/bn.h";
-  write(f, bn_os);
+
+  write("lib/bn.cc", bn_os);
+  write("lib/bn.h", hbn_os);
 #else
   for (int i = 0; i < this_bn_in_out.size(); i++) {
     auto m = mean[i];
@@ -612,6 +615,8 @@ static void MyBatchNorm(void* img_in,
   if (WARM_UP_FOR_INFER) {
     float* img = (float*)img_in;
     float* out = (float*)img_out;
+    std::vector<int> param = {h, w, c};
+    __globle_bn_params.push_back(param);
 
     std::vector<std::vector<int>> in_out;
     for (auto c_ = 0; c_ < c; c_++) {
@@ -1168,9 +1173,8 @@ void CodeGen(void* mem_main0, void* mem_main1, void* mem_temp) {
   }
   header_os << "#include \"bottle.h\"\n";
 
-  
   std::ostringstream func_os;
-  
+
   func_os << "#include <immintrin.h>\n";
   func_os << "inline float avx2_sum(__m256 in_vec) {\n";
   func_os << "  in_vec = _mm256_add_ps(in_vec, _mm256_permute2f128_ps(in_vec, in_vec, 1));\n";
@@ -1263,7 +1267,7 @@ void CodeGen(void* mem_main0, void* mem_main1, void* mem_temp) {
   cmd +=
       "g++ -mavx -shared -fPIC -I/usr/include/opencv4 -lopencv_core -lopencv_imgproc "
       "-lopencv_highgui "
-      "-lopencv_imgcodecs -o libcodegen.so codegen.cc add.cc maxpool.cc fc.cc ";
+      "-lopencv_imgcodecs -o libcodegen.so codegen.cc add.cc maxpool.cc avgpool.cc bn.cc fc.cc ";
   for (int i = 0; i < 53; i++) {
     cmd += "conv_" + std::to_string(i) + ".o ";
   }
