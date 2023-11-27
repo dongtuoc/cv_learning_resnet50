@@ -194,7 +194,11 @@ int main() {
 
     // inference start
     int start = GetTime();
+#if CODE_GEN
     myFunc(__global_mem_main0, __global_mem_main1, __global_mem_temp);
+#else
+    CodeGen(__global_mem_main0, __global_mem_main1, __global_mem_temp);
+#endif
     int end = GetTime();
     // inference done
 
