@@ -1,5 +1,14 @@
 import numpy as np
 
+def Visualization(img):
+  import matplotlib.pyplot as plt
+  fig, ax = plt.subplots(1, 4,figsize=(12,16))
+  ax[0].matshow(img[:, :, 0], cmap="viridis")
+  ax[1].matshow(img[:, :, 5], cmap="viridis")
+  ax[2].matshow(img[:, :, 11], cmap="viridis")
+  ax[3].matshow(img[:, :, 24], cmap="viridis")
+  plt.savefig("a.png")
+
 # we just use NHWC to calculate
 # no dilation
 def Conv2d(img, weight, hi, wi, ci, co, kernel, stride, pad):
@@ -56,5 +65,6 @@ def Conv2dOpt(img, weight, hi, wi, ci, co, kernel, stride, pad):
             # use vdot to optimize MAC operation
             acc += np.vdot(img[hi_index][wi_index], weight[co_][kh_][kw_])
         img_out[ho_][wo_][co_] = acc
+
   return img_out
 
