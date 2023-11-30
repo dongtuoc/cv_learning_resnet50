@@ -12,11 +12,13 @@
 #include "../label.h"
 #include "./resnet_no_malloc.h"
 
+extern int put_cnt;
+extern int out_cnt;
+extern void* __global_weight[MAX_MEM_NUM];
+
 static std::map<std::string, int> GetFileName() {
   std::map<std::string, int> res;
   std::string dir_path("../../pics/ani_12/");
-  // filenames.push_back(dir_path + std::string("Niu.jpg"));
-  // return filenames;
   DIR* dir = opendir(dir_path.c_str());
   if (dir == nullptr) {
     std::cerr << "Failed to open directory: " << dir_path << std::endl;
@@ -83,23 +85,11 @@ static void PreProcess(const std::string& file_name, void* out) {
     // }
   };
 
-  auto show = [](cv::Mat img, int h, int w) {
-    for (int i = 0; i < h; i++) {
-      for (int j = 0; j < w; j++) {
-        printf("%d %d %d\n", ((uint8_t*)img.data)[i * w * 3 + j * 3 + 0],
-               ((uint8_t*)img.data)[i * w * 3 + j * 3 + 1],
-               ((uint8_t*)img.data)[i * w * 3 + j * 3 + 2]);
-      }
-    }
-    exit(0);
-  };
-
   float* mat_data = (float*)out;
   cv::Mat source_o, img_o, img_r;
   source_o = cv::imread(file_name);
   cv::cvtColor(source_o, img_o, cv::COLOR_BGR2RGB);
   cv::resize(img_o, img_r, {224, 224});
-  // show(img_r, 256, 256);
 
   uint8_t* trans_data = (uint8_t*)malloc(224 * 224 * 3 * sizeof(uint8_t));
   // NCHW -> NHWC
@@ -165,51 +155,50 @@ int main() {
     int h1, w1, c1;
 
     int start = GetTime();
-    ComputeLayerConv2d<false>(__global_mem_main0, __global_mem_main1, 224, 224, h1, w1, c1,
-                              "conv1");
-    ComputeLayerBatchNorm<false>(__global_mem_main1, __global_mem_main0, h1, w1, c1, "bn1");
-    ComputeLayerRelu<false>(__global_mem_main0, h1 * w1 * c1);
-    ComputeLayerMaxPool<false>(__global_mem_main0, __global_mem_main1);
+    ComputeLayerConv2d(__global_mem_main0, __global_mem_main1, 224, 224, h1, w1, c1);
+    ComputeLayerBatchNorm(__global_mem_main1, __global_mem_main0, h1, w1, c1);
+    ComputeLayerRelu(__global_mem_main0, h1 * w1 * c1);
+    ComputeLayerMaxPool(__global_mem_main0, __global_mem_main1);
     // layer1
-    ComputeBottleNeck<false>(__global_mem_main1, __global_mem_main0, __global_mem_temp, 56, 56, h1,
-                             w1, c1, "layer1_bottleneck0", true);
-    ComputeBottleNeck<false>(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0,
-                             w0, c0, "layer1_bottleneck1", false);
-    ComputeBottleNeck<false>(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1,
-                             w1, c1, "layer1_bottleneck2", false);
+    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, 56, 56, h1, w1, c1,
+                      true);
+    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
+                      false);
+    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1, w1, c1,
+                      false);
     // layer2
-    ComputeBottleNeck<false>(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0,
-                             w0, c0, "layer2_bottleneck0", true);
-    ComputeBottleNeck<false>(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1,
-                             w1, c1, "layer2_bottleneck1", false);
-    ComputeBottleNeck<false>(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0,
-                             w0, c0, "layer2_bottleneck2", false);
-    ComputeBottleNeck<false>(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1,
-                             w1, c1, "layer2_bottleneck3", false);
+    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
+                      true);
+    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1, w1, c1,
+                      false);
+    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
+                      false);
+    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1, w1, c1,
+                      false);
     // layer3
-    ComputeBottleNeck<false>(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0,
-                             w0, c0, "layer3_bottleneck0", true);
-    ComputeBottleNeck<false>(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1,
-                             w1, c1, "layer3_bottleneck1", false);
-    ComputeBottleNeck<false>(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0,
-                             w0, c0, "layer3_bottleneck2", false);
-    ComputeBottleNeck<false>(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1,
-                             w1, c1, "layer3_bottleneck3", false);
-    ComputeBottleNeck<false>(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0,
-                             w0, c0, "layer3_bottleneck4", false);
-    ComputeBottleNeck<false>(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1,
-                             w1, c1, "layer3_bottleneck5", false);
+    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
+                      true);
+    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1, w1, c1,
+                      false);
+    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
+                      false);
+    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1, w1, c1,
+                      false);
+    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
+                      false);
+    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1, w1, c1,
+                      false);
     // layer4
-    ComputeBottleNeck<false>(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0,
-                             w0, c0, "layer4_bottleneck0", true);
-    ComputeBottleNeck<false>(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1,
-                             w1, c1, "layer4_bottleneck1", false);
-    ComputeBottleNeck<false>(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0,
-                             w0, c0, "layer4_bottleneck2", false);
+    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
+                      true);
+    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1, w1, c1,
+                      false);
+    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
+                      false);
     // avg pool
-    ComputeLayerAvgPool<false>(__global_mem_main1, __global_mem_main0);
+    ComputeLayerAvgPool(__global_mem_main1, __global_mem_main0);
     // Linear
-    ComputeLayerFC<false>(__global_mem_main0, __global_mem_main1, "fc");
+    ComputeLayerFC(__global_mem_main0, __global_mem_main1);
 
     int end = GetTime();
     int time = end - start;

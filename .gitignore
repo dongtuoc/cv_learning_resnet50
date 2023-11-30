@@ -1,0 +1,17 @@
+# Object files
+*.o
+*.a
+*.dep
+*.bin
+*.so
+*.sec
+*.data
+
+# temp file
+*~
+
+#Build & install directories
+*/**/build/*
+*/**/install/*
+*/**/output/*
+*/**/resnet
