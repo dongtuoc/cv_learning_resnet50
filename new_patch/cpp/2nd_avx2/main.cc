@@ -24,7 +24,7 @@ std::vector<std::string> getFileName() {
   }
   dirent* entry;
   while ((entry = readdir(dir)) != nullptr) {
-    if (entry->d_type == DT_REG) {  // 如果是普通文件
+    if (entry->d_type == DT_REG) {
       filenames.push_back(dir_path + std::string(entry->d_name));
     }
   }
@@ -47,16 +47,16 @@ float* preprocess(const std::string& file_name) {
     // }
   };
 
-  auto show = [](cv::Mat img, int h, int w) {
-    for (int i = 0; i < h; i++) {
-      for (int j = 0; j < w; j++) {
-        printf("%d %d %d\n", ((uint8_t*)img.data)[i * w * 3 + j * 3 + 0],
-               ((uint8_t*)img.data)[i * w * 3 + j * 3 + 1],
-               ((uint8_t*)img.data)[i * w * 3 + j * 3 + 2]);
-      }
-    }
-    exit(0);
-  };
+  // auto show = [](cv::Mat img, int h, int w) {
+  //   for (int i = 0; i < h; i++) {
+  //     for (int j = 0; j < w; j++) {
+  //       printf("%d %d %d\n", ((uint8_t*)img.data)[i * w * 3 + j * 3 + 0],
+  //              ((uint8_t*)img.data)[i * w * 3 + j * 3 + 1],
+  //              ((uint8_t*)img.data)[i * w * 3 + j * 3 + 2]);
+  //     }
+  //   }
+  //   exit(0);
+  // };
 
   float* mat_data = (float*)malloc(224 * 224 * 3 * sizeof(float));
   cv::Mat source_o, img_o, img_r;
