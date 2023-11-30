@@ -10,13 +10,15 @@
 #include <vector>
 
 #include "../label.h"
-#include "./resnet_warmup.h"
+#include "./resnet_codegen.h"
+
+extern int put_cnt;
+extern int out_cnt;
+extern void* __global_weight[MAX_MEM_NUM];
 
 static std::map<std::string, int> GetFileName() {
   std::map<std::string, int> res;
   std::string dir_path("../../pics/ani_12/");
-  // filenames.push_back(dir_path + std::string("Niu.jpg"));
-  // return filenames;
   DIR* dir = opendir(dir_path.c_str());
   if (dir == nullptr) {
     std::cerr << "Failed to open directory: " << dir_path << std::endl;
@@ -83,23 +85,11 @@ static void PreProcess(const std::string& file_name, void* out) {
     // }
   };
 
-  auto show = [](cv::Mat img, int h, int w) {
-    for (int i = 0; i < h; i++) {
-      for (int j = 0; j < w; j++) {
-        printf("%d %d %d\n", ((uint8_t*)img.data)[i * w * 3 + j * 3 + 0],
-               ((uint8_t*)img.data)[i * w * 3 + j * 3 + 1],
-               ((uint8_t*)img.data)[i * w * 3 + j * 3 + 2]);
-      }
-    }
-    exit(0);
-  };
-
   float* mat_data = (float*)out;
   cv::Mat source_o, img_o, img_r;
   source_o = cv::imread(file_name);
   cv::cvtColor(source_o, img_o, cv::COLOR_BGR2RGB);
   cv::resize(img_o, img_r, {224, 224});
-  // show(img_r, 256, 256);
 
   uint8_t* trans_data = (uint8_t*)malloc(224 * 224 * 3 * sizeof(uint8_t));
   // NCHW -> NHWC
@@ -148,26 +138,71 @@ int GetTime() {
 }
 
 int main() {
+  PreLoadParams();
+  const auto& files = GetFileName();
+  int total_time = 0;
+
   void* __global_mem_main0 = malloc(8 * 1024 * 1024);
   void* __global_mem_main1 = malloc(8 * 1024 * 1024);
   void* __global_mem_temp = malloc(8 * 1024 * 1024);
 
-  // preload weight/bias to memory
-  PreLoadParams();
-  // warm up the inference routies, fix the addr for all memory and cal-offset
-  WarmUp(__global_mem_main0, __global_mem_main1, __global_mem_temp);
-
-  int total_time = 0;
-  const auto& files = GetFileName();
   for (auto it : files) {
+    out_cnt = 0;
     std::cout << "\nBegin to predict : " << it.first << std::endl;
     PreProcess(it.first, __global_mem_main0);
 
-    // inference start
+    int h0, w0, c0;
+    int h1, w1, c1;
+
     int start = GetTime();
-    Infer(__global_mem_main0, __global_mem_main1, __global_mem_temp);
+    ComputeLayerConv2d(__global_mem_main0, __global_mem_main1, 224, 224, h1, w1, c1);
+    ComputeLayerBatchNorm(__global_mem_main1, __global_mem_main0, h1, w1, c1);
+    ComputeLayerRelu(__global_mem_main0, h1 * w1 * c1);
+    ComputeLayerMaxPool(__global_mem_main0, __global_mem_main1);
+    // layer1
+    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, 56, 56, h1, w1, c1,
+                      true);
+    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
+                      false);
+    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1, w1, c1,
+                      false);
+    // layer2
+    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
+                      true);
+    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1, w1, c1,
+                      false);
+    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
+                      false);
+    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1, w1, c1,
+                      false);
+    // layer3
+    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
+                      true);
+    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1, w1, c1,
+                      false);
+    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
+                      false);
+    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1, w1, c1,
+                      false);
+    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
+                      false);
+    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1, w1, c1,
+                      false);
+    // layer4
+    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
+                      true);
+    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1, w1, c1,
+                      false);
+    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
+                      false);
+    // avg pool
+    ComputeLayerAvgPool(__global_mem_main1, __global_mem_main0);
+    // Linear
+    ComputeLayerFC(__global_mem_main0, __global_mem_main1);
+
     int end = GetTime();
-    // inference done
+    int time = end - start;
+    total_time += time;
 
     int res_label = ShowResult(__global_mem_main1);
     if (res_label == it.second) {
@@ -176,8 +211,7 @@ int main() {
       std::cout << "\033[0;31mInference Result Fail: Golden Label: " << it.second
                 << ", Res Lable: " << res_label << "\033[0m" << std::endl;
     }
-    std::cout << "\033[0;32mTime cost : " << end - start << " ms.\033[0m\n" << std::endl;
-    total_time += (end - start);
+    std::cout << "\033[0;32mTime cost : " << time << " ms.\033[0m\n" << std::endl;
   }
   float latency = (float)(total_time) / (float)(files.size());
   std::cout << "\033[0;32mAverage Latency : " << latency << "ms \033[0m" << std::endl;
@@ -188,6 +222,5 @@ int main() {
   free(__global_mem_main0);
   free(__global_mem_main1);
   free(__global_mem_temp);
-
   return 0;
 }
