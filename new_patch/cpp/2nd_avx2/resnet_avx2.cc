@@ -42,13 +42,13 @@ float* compute_relu_layer(float* img, int len) {
 }
 
 float* compute_conv_layer(float* img,
-                                 int hi,
-                                 int wi,
-                                 int& ho,
-                                 int& wo,
-                                 int& co,
-                                 const std::string& layer_name,
-                                 bool is_free_img = true) {
+                          int hi,
+                          int wi,
+                          int& ho,
+                          int& wo,
+                          int& co,
+                          const std::string& layer_name,
+                          bool is_free_img = true) {
   auto param = load_conv_param(layer_name, 5);
   // ci, co, kernel, stride, pad
   auto ci = param[0];
@@ -85,22 +85,18 @@ float* compute_bn_layer(float* in_data, int h, int w, int c, const std::string& 
   return my_bn(in_data, mean, var, gamma, bias, h, w, c);
 }
 
-float* compute_maxpool_layer(float* in_data) {
-  return my_max_pool(in_data);
-}
+float* compute_maxpool_layer(float* in_data) { return my_max_pool(in_data); }
 
-float* compute_avgpool_layer(float* in_data) {
-  return my_avg_pool(in_data);
-}
+float* compute_avgpool_layer(float* in_data) { return my_avg_pool(in_data); }
 
 float* compute_bottleneck(float* in_data,
-                                 int hi,
-                                 int wi,
-                                 int& ho,
-                                 int& wo,
-                                 int& co,
-                                 const std::string& bottleneck_layer_name,
-                                 bool down_sample) {
+                          int hi,
+                          int wi,
+                          int& ho,
+                          int& wo,
+                          int& co,
+                          const std::string& bottleneck_layer_name,
+                          bool down_sample) {
   int h0, w0, c0;
   int h1, w1, c1;
   auto out =

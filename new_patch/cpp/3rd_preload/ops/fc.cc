@@ -6,7 +6,9 @@
 #include <opencv2/opencv.hpp>
 #include <string>
 
-float* my_fc(float* img, float* weight, float* bias) {
+float* MyFCPreLoad(float* img, float* weight, float* bias) { return img; }
+
+float* MyFC(float* img, float* weight, float* bias) {
   float* out = (float*)malloc(1000 * sizeof(float));
   for (int i = 0; i < 1000; i++) {
     float sum_x = float(0);
@@ -18,7 +20,5 @@ float* my_fc(float* img, float* weight, float* bias) {
     out[i] = sum_x + bias[i];
   }
   free(img);
-  free(weight);
-  free(bias);
   return out;
 }

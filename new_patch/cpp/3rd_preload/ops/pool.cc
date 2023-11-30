@@ -6,7 +6,9 @@
 #include <opencv2/opencv.hpp>
 #include <string>
 
-float* my_max_pool(float* img) {
+float* MyMaxPoolPreLoad(float* img) { return img; }
+
+float* MyMaxPool(float* img) {
   const auto hi = 112;
   const auto wi = 112;
   const auto channel = 64;
@@ -43,7 +45,9 @@ float* my_max_pool(float* img) {
   return out;
 }
 
-float* my_avg_pool(float* img) {
+float* MyAvgPoolPreLoad(float* img) { return img; }
+
+float* MyAvgPool(float* img) {
   const auto hi = 7;
   const auto wi = 7;
   const auto channel = 2048;

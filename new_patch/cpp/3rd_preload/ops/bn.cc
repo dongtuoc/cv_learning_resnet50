@@ -6,7 +6,13 @@
 #include <opencv2/opencv.hpp>
 #include <string>
 
-float* my_bn(float* img, float* mean, float* var, float* gamma, float* bias, int h, int w, int c) {
+float* MyBatchNormPreLoad(
+    float* img, float* mean, float* var, float* gamma, float* bias, int h, int w, int c) {
+  return img;
+}
+
+float* MyBatchNorm(
+    float* img, float* mean, float* var, float* gamma, float* bias, int h, int w, int c) {
   float* out = (float*)malloc(h * w * c * sizeof(float));
   for (auto c_ = 0; c_ < c; c_++) {
     auto m = mean[c_];
@@ -21,9 +27,5 @@ float* my_bn(float* img, float* mean, float* var, float* gamma, float* bias, int
     }
   }
   free(img);
-  free(mean);
-  free(var);
-  free(gamma);
-  free(bias);
   return out;
 }

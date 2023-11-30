@@ -6,21 +6,38 @@
 #include <opencv2/opencv.hpp>
 #include <string>
 
-float* my_conv2d(float* img,
-                 float* weight,
-                 int hi,
-                 int wi,
-                 int& ho,
-                 int& wo,
-                 int ci,
-                 int co,
-                 int kernel,
-                 int stride,
-                 int pad,
-                 bool is_first,
-                 bool is_free_img = true) {
+float* MyConv2dPreLoad(float* img,
+                       float* weight,
+                       int hi,
+                       int wi,
+                       int& ho,
+                       int& wo,
+                       int ci,
+                       int co,
+                       int kernel,
+                       int stride,
+                       int pad) {
   ho = (hi + 2 * pad - kernel) / stride + 1;
   wo = (wi + 2 * pad - kernel) / stride + 1;
+  return img;
+}
+
+float* MyConv2d(float* img,
+                float* weight,
+                int hi,
+                int wi,
+                int& ho,
+                int& wo,
+                int ci,
+                int co,
+                int kernel,
+                int stride,
+                int pad,
+                bool First,
+                bool is_free_img = true) {
+  ho = (hi + 2 * pad - kernel) / stride + 1;
+  wo = (wi + 2 * pad - kernel) / stride + 1;
+
   float* out = (float*)malloc(ho * wo * co * sizeof(float));
 
   for (int co_idx = 0; co_idx < co; co_idx++) {
@@ -33,7 +50,7 @@ float* my_conv2d(float* img,
         const int filter_h_end = std::min(kernel, hi - in_h_origin);
         const int filter_w_end = std::min(kernel, wi - in_w_origin);
         register float acc = 0;
-        if (is_first) {
+        if (First) {
           for (int kh_idx = filter_h_start; kh_idx < filter_h_end; kh_idx++) {
             const int hi_index = in_h_origin + kh_idx;
             for (int kw_idx = filter_w_start; kw_idx < filter_w_end; kw_idx++) {
@@ -77,6 +94,5 @@ float* my_conv2d(float* img,
   if (is_free_img) {
     free(img);
   }
-  free(weight);
   return out;
 }

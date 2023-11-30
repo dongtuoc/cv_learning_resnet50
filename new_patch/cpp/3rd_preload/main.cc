@@ -12,6 +12,8 @@
 #include "../label.h"
 #include "resnet_preload.h"
 
+extern std::map<std::string, void*> __global_params;
+
 static std::vector<std::string> GetFileName() {
   std::vector<std::string> filenames;
   std::string dir_path("../../pics/ani_12/");
@@ -49,16 +51,16 @@ static float* PreProcess(const std::string& file_name) {
     // }
   };
 
-  auto show = [](cv::Mat img, int h, int w) {
-    for (int i = 0; i < h; i++) {
-      for (int j = 0; j < w; j++) {
-        printf("%d %d %d\n", ((uint8_t*)img.data)[i * w * 3 + j * 3 + 0],
-               ((uint8_t*)img.data)[i * w * 3 + j * 3 + 1],
-               ((uint8_t*)img.data)[i * w * 3 + j * 3 + 2]);
-      }
-    }
-    exit(0);
-  };
+  // auto show = [](cv::Mat img, int h, int w) {
+  //   for (int i = 0; i < h; i++) {
+  //     for (int j = 0; j < w; j++) {
+  //       printf("%d %d %d\n", ((uint8_t*)img.data)[i * w * 3 + j * 3 + 0],
+  //              ((uint8_t*)img.data)[i * w * 3 + j * 3 + 1],
+  //              ((uint8_t*)img.data)[i * w * 3 + j * 3 + 2]);
+  //     }
+  //   }
+  //   exit(0);
+  // };
 
   float* mat_data = (float*)malloc(224 * 224 * 3 * sizeof(float));
   cv::Mat source_o, img_o, img_r;
@@ -124,34 +126,34 @@ int main() {
 
     int h0, w0, c0;
     int h1, w1, c1;
-    img = ComputeLayerConv2d<false>(img, 224, 224, h1, w1, c1, "conv1");
-    img = ComputeLayerBatchNorm<false>(img, h1, w1, c1, "bn1");
-    img = ComputeLayerRelu<false>(img, h1 * w1 * c1);
-    img = ComputeLayerMaxPool<false>(img);
+    img = ComputeLayerConv2d(img, 224, 224, h1, w1, c1, "conv1");
+    img = ComputeLayerBatchNorm(img, h1, w1, c1, "bn1");
+    img = ComputeLayerRelu(img, h1 * w1 * c1);
+    img = ComputeLayerMaxPool(img);
     // layer1
-    img = ComputeBottleNeck<false>(img, 56, 56, h1, w1, c1, "layer1_bottleneck0", true);
-    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer1_bottleneck1", false);
-    img = ComputeBottleNeck<false>(img, h0, w0, h1, w1, c1, "layer1_bottleneck2", false);
+    img = ComputeBottleNeck(img, 56, 56, h1, w1, c1, "layer1_bottleneck0", true);
+    img = ComputeBottleNeck(img, h1, w1, h0, w0, c0, "layer1_bottleneck1", false);
+    img = ComputeBottleNeck(img, h0, w0, h1, w1, c1, "layer1_bottleneck2", false);
     // layer2
-    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer2_bottleneck0", true);
-    img = ComputeBottleNeck<false>(img, h0, w0, h1, w1, c1, "layer2_bottleneck1", false);
-    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer2_bottleneck2", false);
-    img = ComputeBottleNeck<false>(img, h0, w0, h1, w1, c1, "layer2_bottleneck3", false);
+    img = ComputeBottleNeck(img, h1, w1, h0, w0, c0, "layer2_bottleneck0", true);
+    img = ComputeBottleNeck(img, h0, w0, h1, w1, c1, "layer2_bottleneck1", false);
+    img = ComputeBottleNeck(img, h1, w1, h0, w0, c0, "layer2_bottleneck2", false);
+    img = ComputeBottleNeck(img, h0, w0, h1, w1, c1, "layer2_bottleneck3", false);
     // layer3
-    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer3_bottleneck0", true);
-    img = ComputeBottleNeck<false>(img, h0, w0, h1, w1, c1, "layer3_bottleneck1", false);
-    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer3_bottleneck2", false);
-    img = ComputeBottleNeck<false>(img, h0, w0, h1, w1, c1, "layer3_bottleneck3", false);
-    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer3_bottleneck4", false);
-    img = ComputeBottleNeck<false>(img, h0, w0, h1, w1, c1, "layer3_bottleneck5", false);
+    img = ComputeBottleNeck(img, h1, w1, h0, w0, c0, "layer3_bottleneck0", true);
+    img = ComputeBottleNeck(img, h0, w0, h1, w1, c1, "layer3_bottleneck1", false);
+    img = ComputeBottleNeck(img, h1, w1, h0, w0, c0, "layer3_bottleneck2", false);
+    img = ComputeBottleNeck(img, h0, w0, h1, w1, c1, "layer3_bottleneck3", false);
+    img = ComputeBottleNeck(img, h1, w1, h0, w0, c0, "layer3_bottleneck4", false);
+    img = ComputeBottleNeck(img, h0, w0, h1, w1, c1, "layer3_bottleneck5", false);
     // layer4
-    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer4_bottleneck0", true);
-    img = ComputeBottleNeck<false>(img, h0, w0, h1, w1, c1, "layer4_bottleneck1", false);
-    img = ComputeBottleNeck<false>(img, h1, w1, h0, w0, c0, "layer4_bottleneck2", false);
+    img = ComputeBottleNeck(img, h1, w1, h0, w0, c0, "layer4_bottleneck0", true);
+    img = ComputeBottleNeck(img, h0, w0, h1, w1, c1, "layer4_bottleneck1", false);
+    img = ComputeBottleNeck(img, h1, w1, h0, w0, c0, "layer4_bottleneck2", false);
     // avg pool
-    img = ComputeLayerAvgPool<false>(img);
+    img = ComputeLayerAvgPool(img);
     // Linear
-    img = ComputeLayerFC<false>(img, "fc");
+    img = ComputeLayerFC(img, "fc");
 
     int end = GetTime();
     int time = end - start;
