@@ -158,18 +158,20 @@ int main() {
   // CodeGen function will generate a `libcodegen.so` under ./lib/ directory.
   CodeGen(__global_mem_main0, __global_mem_main1, __global_mem_temp);
 
-  void* handle = dlopen("./lib/libcodegen.so", RTLD_LAZY);
+  CompileModule();
+  // auto resnet = (Module)LoadModule();
+  typedef void (*Module)(void*, void*, void*);
+  void* handle = dlopen("./lib/libresnet.so", RTLD_LAZY);
   if (!handle) {
     printf("Error dlopen.\n");
     return 0;
   }
-  typedef void (*Func)(void*, void*, void*);
-  auto myFunc = (Func)dlsym(handle, "_Z5InferPvS_S_");
+  auto myFunc = (Module)dlsym(handle, "_Z5InferPvS_S_");
   if (!myFunc) {
-    printf("Error dlsym.\n");
+    printf("Error with dlsym.\n");
     return 0;
   } else {
-    printf("Succ get Codegen Func\n");
+    printf("Succ Get myFunc\n");
   }
 #endif
 

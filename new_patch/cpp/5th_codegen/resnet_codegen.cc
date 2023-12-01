@@ -1,5 +1,6 @@
 #include "resnet_codegen.h"
 
+#include <dlfcn.h>
 #include <immintrin.h>
 
 #include <cmath>
@@ -65,8 +66,12 @@ void ComputeLayerRelu(void* img_in, int len) {
 #if CODE_GEN
   std::ostringstream relu_os;
   relu_os << "inline void ComputeLayerRelu_" << relu_cnt << "(float* img) {\n";
-  relu_os << "  for (int i = 0; i < " << len << "; ++i) {\n";
-  relu_os << "    img[i] = img[i] > 0 ? img[i] : 0;\n";
+  relu_os << "  __m256 zero = _mm256_setzero_ps();\n";
+  relu_os << "  __m256 in_vec;\n";
+  relu_os << "  const int vec_size = 8;\n";
+  relu_os << "  for (int l = 0; l < " << len << "; l += vec_size) {\n";
+  relu_os << "    in_vec = _mm256_loadu_ps(&img[l]);\n";
+  relu_os << "    _mm256_storeu_ps(&img[l], _mm256_max_ps(in_vec, zero));\n";
   relu_os << "  }\n";
   relu_os << "}\n";
   write("lib/relu.h", relu_os);
@@ -118,15 +123,11 @@ void ComputeLayerConv2d(void* img_in, void* img_out, int hi, int wi, int& ho, in
     MyConv2d(img_in, img_out, weight, hi, wi, ho, wo, ci, co, kernel, stride, pad, false);
   }
 #if CODE_GEN
-  std::ostringstream imp_os;
   std::ostringstream dec_os;
-  dec_os << "void ComputeLayerConv2d_" << conv_idx << "(void* img_in, void* img_out);\n";
-  imp_os << "void ComputeLayerConv2d_" << conv_idx << "(void* img_in, void* img_out) {\n";
-  imp_os << "  MyConv2d_" << conv_idx << "(img_in, img_out, (float *)" << weight << ");\n";
-  imp_os << "}\n";
-  const std::string fi = "lib/conv_" + std::to_string(conv_idx) + ".cc";
+  dec_os << "inline void ComputeLayerConv2d_" << conv_idx << "(void* img_in, void* img_out) {\n";
+  dec_os << "  MyConv2d_" << conv_idx << "(img_in, img_out, (float *)" << weight << ");\n";
+  dec_os << "}\n";
   const std::string fd = "lib/conv_" + std::to_string(conv_idx) + ".h";
-  write(fi, imp_os);
   write(fd, dec_os);
   conv_idx++;
   return;
@@ -180,16 +181,12 @@ void ComputeLayerBatchNorm(void* in_data, void* out_data, int h, int w, int c) {
   auto var = (float*)__global_weight[out_cnt++];
   MyBatchNorm(in_data, out_data, mean, var, gamma, bias, h, w, c);
 #if CODE_GEN
-  std::ostringstream imp_os;
   std::ostringstream dec_os;
-  dec_os << "void ComputeLayerBatchNorm_" << bn_cnt << "(void* in_data, void* out_data);\n";
-  imp_os << "void ComputeLayerBatchNorm_" << bn_cnt << "(void* in_data, void* out_data) {\n";
-  imp_os << "  MyBatchNorm_" << bn_cnt << "(in_data, out_data, (float*)" << mean << ", (float*)"
+  dec_os << "inline void ComputeLayerBatchNorm_" << bn_cnt << "(void* in_data, void* out_data) {\n";
+  dec_os << "  MyBatchNorm_" << bn_cnt << "(in_data, out_data, (float*)" << mean << ", (float*)"
          << var << ", (float*)" << gamma << ", (float *)" << bias << ");\n";
-  imp_os << "}\n";
-  const std::string fi = "lib/bn.cc";
+  dec_os << "}\n";
   const std::string fd = "lib/bn.h";
-  write(fi, imp_os);
   write(fd, dec_os);
   bn_cnt++;
   return;
@@ -201,15 +198,11 @@ void ComputeLayerMaxPoolPreLoad(void* in_data, void* out_data) { return; }
 void ComputeLayerMaxPool(void* in_data, void* out_data) {
   MyMaxPool(in_data, out_data);
 #if CODE_GEN
-  std::ostringstream imp_os;
   std::ostringstream dec_os;
-  dec_os << "void ComputeLayerMaxPool(void* in_data, void* out_data);\n";
-  imp_os << "void ComputeLayerMaxPool(void* in_data, void* out_data) {\n";
-  imp_os << "  MyMaxPool(in_data, out_data);\n";
-  imp_os << "}\n";
-  const std::string fi = "lib/maxpool.cc";
+  dec_os << "inline void ComputeLayerMaxPool(void* in_data, void* out_data) {\n";
+  dec_os << "  MyMaxPool(in_data, out_data);\n";
+  dec_os << "}\n";
   const std::string fd = "lib/maxpool.h";
-  write(fi, imp_os);
   write(fd, dec_os);
 #endif
 }
@@ -219,15 +212,11 @@ void ComputeLayerAvgPoolPreLoad(void* in_data, void* out_data) { return; }
 void ComputeLayerAvgPool(void* in_data, void* out_data) {
   MyAvgPool(in_data, out_data);
 #if CODE_GEN
-  std::ostringstream imp_os;
   std::ostringstream dec_os;
-  dec_os << "void ComputeLayerAvgPool(void* in_data, void* out_data);\n";
-  imp_os << "void ComputeLayerAvgPool(void* in_data, void* out_data) {\n";
-  imp_os << "  MyAvgPool(in_data, out_data);\n";
-  imp_os << "}\n";
-  const std::string fi = "lib/avgpool.cc";
+  dec_os << "inline void ComputeLayerAvgPool(void* in_data, void* out_data) {\n";
+  dec_os << "  MyAvgPool(in_data, out_data);\n";
+  dec_os << "}\n";
   const std::string fd = "lib/avgpool.h";
-  write(fi, imp_os);
   write(fd, dec_os);
 #endif
 }
@@ -237,30 +226,27 @@ void AddPreLoad(float* l, float* r, float* out, int len) { return; }
 int add_cnt = 0;
 void Add(float* l, float* r, float* out, int len) {
 #if CODE_GEN
-  std::ostringstream imp_os;
   std::ostringstream dec_os;
-  dec_os << "void Add_" << add_cnt << "(float* l, float* r, float* out);\n";
-  imp_os << "void Add_" << add_cnt << "(float* l, float* r, float* out) {\n";
-  imp_os << "  for (int i = 0; i < " << len << "; i += 8) {\n";
-  imp_os << "    out[i + 0] = l[i + 0] + r[i + 0];\n";
-  imp_os << "    out[i + 1] = l[i + 1] + r[i + 1];\n";
-  imp_os << "    out[i + 2] = l[i + 2] + r[i + 2];\n";
-  imp_os << "    out[i + 3] = l[i + 3] + r[i + 3];\n";
-  imp_os << "    out[i + 4] = l[i + 4] + r[i + 4];\n";
-  imp_os << "    out[i + 5] = l[i + 5] + r[i + 5];\n";
-  imp_os << "    out[i + 6] = l[i + 6] + r[i + 6];\n";
-  imp_os << "    out[i + 7] = l[i + 7] + r[i + 7];\n";
-  imp_os << "  }\n";
-  imp_os << "}\n";
-  const std::string fi = "lib/add.cc";
+  if (add_cnt == 0) {
+    dec_os << "#include <immintrin.h>\n";
+  }
+  dec_os << "inline void Add_" << add_cnt << "(float* l, float* r, float* out) {\n";
+  dec_os << "  const int vec_size = 8;\n";
+  dec_os << "  __m256 l_vec, r_vec, res_vec;\n";
+  dec_os << "  for (int i = 0; i < " << len << "; i += vec_size) {\n";
+  dec_os << "    l_vec = _mm256_loadu_ps(l + i);\n";
+  dec_os << "    r_vec = _mm256_loadu_ps(r + i);\n";
+  dec_os << "    res_vec = _mm256_add_ps(l_vec, r_vec);\n";
+  dec_os << "    _mm256_storeu_ps(out + i, res_vec);\n";
+  dec_os << "  }\n";
+  dec_os << "}\n";
   const std::string fd = "lib/add.h";
-  write(fi, imp_os);
   write(fd, dec_os);
   add_cnt++;
   return;
 #endif
 
-#if 1
+#if 0
   for (int i = 0; i < len; i += 8) {
     out[i + 0] = l[i + 0] + r[i + 0];
     out[i + 1] = l[i + 1] + r[i + 1];
@@ -405,6 +391,7 @@ void ComputeBottleNeck(void* in_data,
   bottle_os << "}\n";
   write("lib/bottle.h", bottle_os);
   bottle_idx++;
+  return;
 #endif
 }
 
@@ -554,7 +541,11 @@ void CodeGen(void* mem_main0, void* mem_main1, void* mem_temp) {
   write("lib/codegen.cc", header_os);
   std::cout << "\033[0;32mCode Gen Done \033[0m" << std::endl;
 
-  // begin compile module
+#endif
+}
+
+void CompileModule() {
+  std::cout << "\033[0;32mBegin Compile Module \033[0m" << std::endl;
   std::string cmd = "cd lib;";
   for (int i = 0; i < 53; i++) {
     cmd += "g++ -mavx -fPIC -Ofast -c conv_" + std::to_string(i) +
@@ -564,13 +555,29 @@ void CodeGen(void* mem_main0, void* mem_main1, void* mem_temp) {
   }
 
   cmd +=
-      "g++ -mavx -shared -fPIC -I/usr/include/opencv4 -lopencv_core -lopencv_imgproc "
+      "g++ -mavx -shared -fPIC -Ofast -I/usr/include/opencv4 -lopencv_core -lopencv_imgproc "
       "-lopencv_highgui "
-      "-lopencv_imgcodecs -o libcodegen.so codegen.cc add.cc maxpool.cc avgpool.cc bn.cc fc.cc ";
+      "-lopencv_imgcodecs -o libresnet.so codegen.cc maxpool.cc avgpool.cc bn.cc fc.cc ";
   for (int i = 0; i < 53; i++) {
     cmd += "conv_" + std::to_string(i) + ".o ";
   }
-
   std::system(cmd.c_str());
-#endif
+  std::cout << "\033[0;32mEnd Compile Module \033[0m" << std::endl;
 }
+
+// typedef void (*Module)(void*, void*, void*);
+// Module LoadModule() {
+//   void* handle = dlopen("./lib/libresnet.so", RTLD_LAZY);
+//   if (!handle) {
+//     printf("Error dlopen.\n");
+//     return 0;
+//   }
+//   auto myFunc = (Module)dlsym(handle, "_Z5InferPvS_S_");
+//   if (!myFunc) {
+//     printf("Error with dlsym.\n");
+//     return 0;
+//   } else {
+//     printf("Succ Get myFunc\n");
+//   }
+//   return myFunc;
+// }

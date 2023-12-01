@@ -71,3 +71,5 @@ void ComputeBottleNeck(void* in_data,
 void PreLoadParams();
 
 void CodeGen(void*, void*, void*);
+
+void CompileModule();
