@@ -12,6 +12,7 @@
 
 #Build & install directories
 */**/build/*
+*/**/lib/*
 */**/install/*
 */**/output/*
 */**/resnet

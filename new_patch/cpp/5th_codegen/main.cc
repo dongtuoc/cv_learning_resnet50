@@ -1,4 +1,5 @@
 #include <dirent.h>
+#include <dlfcn.h>
 
 #include <chrono>
 #include <cmath>
@@ -11,6 +12,7 @@
 
 #include "../label.h"
 #include "./resnet_codegen.h"
+#include "ops/common.h"
 
 extern int put_cnt;
 extern int out_cnt;
@@ -146,60 +148,38 @@ int main() {
   void* __global_mem_main1 = malloc(8 * 1024 * 1024);
   void* __global_mem_temp = malloc(8 * 1024 * 1024);
 
+#if CODE_GEN
+  // Once the input/output address of all layers are fixed, and the
+  // params of all layers are determined, we can generate a `const` code
+  // which have a better performence due to the following reasons.
+  // 1. Uncessary calulating for all intermediate data and params is removed.
+  // 2. All weight/bias/OtherParams are fixed to a determined address.
+  //
+  // CodeGen function will generate a `libcodegen.so` under ./lib/ directory.
+  CodeGen(__global_mem_main0, __global_mem_main1, __global_mem_temp);
+
+  void* handle = dlopen("./lib/libcodegen.so", RTLD_LAZY);
+  if (!handle) {
+    printf("Error dlopen.\n");
+    return 0;
+  }
+  typedef void (*Func)(void*, void*, void*);
+  auto myFunc = (Func)dlsym(handle, "_Z5InferPvS_S_");
+  if (!myFunc) {
+    printf("Error dlsym.\n");
+    return 0;
+  } else {
+    printf("Succ get Codegen Func\n");
+  }
+#endif
+
   for (auto it : files) {
     out_cnt = 0;
     std::cout << "\nBegin to predict : " << it.first << std::endl;
     PreProcess(it.first, __global_mem_main0);
 
-    int h0, w0, c0;
-    int h1, w1, c1;
-
     int start = GetTime();
-    ComputeLayerConv2d(__global_mem_main0, __global_mem_main1, 224, 224, h1, w1, c1);
-    ComputeLayerBatchNorm(__global_mem_main1, __global_mem_main0, h1, w1, c1);
-    ComputeLayerRelu(__global_mem_main0, h1 * w1 * c1);
-    ComputeLayerMaxPool(__global_mem_main0, __global_mem_main1);
-    // layer1
-    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, 56, 56, h1, w1, c1,
-                      true);
-    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
-                      false);
-    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1, w1, c1,
-                      false);
-    // layer2
-    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
-                      true);
-    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1, w1, c1,
-                      false);
-    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
-                      false);
-    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1, w1, c1,
-                      false);
-    // layer3
-    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
-                      true);
-    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1, w1, c1,
-                      false);
-    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
-                      false);
-    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1, w1, c1,
-                      false);
-    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
-                      false);
-    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1, w1, c1,
-                      false);
-    // layer4
-    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
-                      true);
-    ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, h0, w0, h1, w1, c1,
-                      false);
-    ComputeBottleNeck(__global_mem_main0, __global_mem_main1, __global_mem_temp, h1, w1, h0, w0, c0,
-                      false);
-    // avg pool
-    ComputeLayerAvgPool(__global_mem_main1, __global_mem_main0);
-    // Linear
-    ComputeLayerFC(__global_mem_main0, __global_mem_main1);
-
+    myFunc(__global_mem_main0, __global_mem_main1, __global_mem_temp);
     int end = GetTime();
     int time = end - start;
     total_time += time;

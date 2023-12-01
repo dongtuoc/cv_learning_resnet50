@@ -5,6 +5,7 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include <string>
+
 #include "common.h"
 
 void MyMaxPoolPreLoad(void* img_in, void* img_out) { return; }

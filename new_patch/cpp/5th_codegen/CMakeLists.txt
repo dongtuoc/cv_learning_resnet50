@@ -6,7 +6,7 @@ if(CCACHE_FOUND)
 endif()
 
 project(resnet)
-
+#set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
@@ -20,4 +20,4 @@ target_sources(resnet PRIVATE ${OPS_SOURCES})
 include_directories(/usr/include/opencv4)
 
 find_package(OpenCV REQUIRED)
-target_link_libraries(resnet PRIVATE ${OpenCV_LIBS})
+target_link_libraries(resnet PRIVATE ${OpenCV_LIBS} dl)

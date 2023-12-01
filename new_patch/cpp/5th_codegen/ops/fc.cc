@@ -5,6 +5,7 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include <string>
+
 #include "common.h"
 
 inline float avx2_sum(__m256 in_vec) {

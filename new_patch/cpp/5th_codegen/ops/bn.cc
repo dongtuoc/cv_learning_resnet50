@@ -5,6 +5,7 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include <string>
+
 #include "common.h"
 
 void MyBatchNormPreLoad(void* img_in,
@@ -35,7 +36,9 @@ void MyBatchNorm(void* img_in,
   hbn_os << "void MyBatchNorm_" << bn_cnt << "(\n";
   hbn_os
       << "    void* img_in, void* img_out, float* mean, float* var, float* gamma, float* bias);\n";
-  bn_os << "#include <cmath>\n";
+  if (bn_cnt == 0) {
+    bn_os << "#include <cmath>\n";
+  }
   bn_os << "void MyBatchNorm_" << bn_cnt << "(\n";
   bn_os
       << "    void* img_in, void* img_out, float* mean, float* var, float* gamma, float* bias) {\n";
@@ -57,7 +60,6 @@ void MyBatchNorm(void* img_in,
 
   write("lib/bn.cc", bn_os);
   write("lib/bn.h", hbn_os);
-  bn_cnt ++;
   return;
 #endif
 

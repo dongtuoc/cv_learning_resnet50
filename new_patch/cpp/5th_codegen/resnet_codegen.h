@@ -69,3 +69,5 @@ void ComputeBottleNeck(void* in_data,
                        int& co,
                        bool down_sample);
 void PreLoadParams();
+
+void CodeGen(void*, void*, void*);

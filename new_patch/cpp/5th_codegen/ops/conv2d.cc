@@ -5,6 +5,7 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include <string>
+
 #include "common.h"
 
 static inline float avx2_sum(__m256 in_vec) {
@@ -31,6 +32,7 @@ void MyConv2dPreLoad(void* img_in,
   return;
 }
 
+int conv_idx = 0;
 void MyConv2d(void* img_in,
               void* img_out,
               float* weight,
@@ -58,7 +60,6 @@ void MyConv2d(void* img_in,
   imp_os << "  float* out = (float*)img_out;\n";
 
   imp_os << "  for (int co_idx = 0; co_idx < " << co << "; co_idx++) {\n";
-  imp_os << "    int co_idx_for_cal = co_idx * " << kernel * kernel * ci << ";\n";
   imp_os << "    for (int ho_idx = 0; ho_idx < " << ho << "; ho_idx++) {\n";
   imp_os << "      const int in_h_origin = ho_idx * " << stride << " - " << pad << ";\n";
   imp_os << "      for (int wo_idx = 0; wo_idx < " << wo << "; wo_idx++) {\n";
