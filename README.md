@@ -1,4 +1,4 @@
-# cv_learning_from_scratch
+# cv_learning_resnet50
 
 ---
 ## 项目介绍
@@ -113,13 +113,13 @@ $ python3 resnet50_parser.py
 在保存完权值后，利用 python / C++ 语言，分别实现 Conv2d, BatchNorm, Relu, AvgPool, MaxPool, FullyConnect(MatMul) 等核心函数。
 
 按照 [resent50的网络结构](https://mp.weixin.qq.com/s/nIeu58iSy5-cTafkvFxdig), 将以上算法搭起来。
-- 模型文件参考 [model/resnet50.onnx.png](https://gitee.com/iwaihou/cv_learning_from_scratch/blob/master/new_version_with_notes/practice/model/resnet50.onnx.png) 和 [model/resnet50_structure.txt](https://gitee.com/iwaihou/cv_learning_from_scratch/blob/master/new_version_with_notes/practice/model/resnet50_structure.txt) 
-- 手工搭建 resnet50 的网络结构参考 [我手工搭建的模型, Python 版本](https://gitee.com/iwaihou/cv_learning_from_scratch/blob/master/new_version_with_notes/practice/python/infer.py#L354)
+- 模型文件参考 [model/resnet50.onnx.png](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/model/resnet50.onnx.png) 和 [model/resnet50_structure.txt](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/model/resnet50_structure.txt) 
+- 手工搭建 resnet50 的网络结构参考 [我手工搭建的模型, Python 版本](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/python/infer.py#L354)
 
 #### 推理
 
 代码实现完成后，意味着模型运行需要的基础算法和参数已经就位，下面读取一张本地图片，进行推理。
-- 读取一只猫的图片，参考[获取图片](https://gitee.com/iwaihou/cv_learning_from_scratch/blob/master/new_version_with_notes/practice/python/infer.py#L296)
+- 读取一只猫的图片，参考[获取图片](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/python/infer.py#L296)
 
 读取完图片，开始推理，正确推理出来是一只猫，本项目第一阶段目标(准确性验证)即完成。
 
@@ -163,7 +163,7 @@ $ python3 my_infer.py
 #### python 版本的一点优化
 
 利用 np.dot(内积运算)代替卷积的乘累加循环。
-- 优化 python 版本的算法实现：[优化版本](https://gitee.com/iwaihou/cv_learning_from_scratch/blob/master/new_version_with_notes/practice/python/ops/conv2d.py#L73)
+- 优化 python 版本的算法实现：[优化版本](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/python/ops/conv2d.py#L73)
 
 python 不调用三方库的话，很多优化点无法去做(比如指令集不好控制、内存不好控制)，下面还是重点优化C++版本。
 
@@ -176,12 +176,12 @@ python 不调用三方库的话，很多优化点无法去做(比如指令集不
 
 本仓库的 C++ 代码已经合入了几次优化提交，每次都是在前一次优化的基础上做的进一步优化，优化记录可以通过 cpp 目录下的文件名很方便的看出来。
 
-- [cpp/1st_origin](https://gitee.com/iwaihou/cv_learning_from_scratch/tree/master/new_version_with_notes/practice/cpp/1st_origin) 目录下存放的是第一版的 C++ 代码
-- [cpp/2nd_avx2](https://gitee.com/iwaihou/cv_learning_from_scratch/tree/master/new_version_with_notes/practice/cpp/2nd_avx2) 目录下存放的是第二版的 C++ 代码，启用了 **avx2 指令集的优化，以及 -Ofast 编译选项**
-- [cpp/3rd_preload](https://gitee.com/iwaihou/cv_learning_from_scratch/tree/master/new_version_with_notes/practice/cpp/3rd_preload) 目录下存放的是第三版的 C++ 代码，利用类似内存池的方式，增加了**权值提前加载**的逻辑，仍保留了每一层结果输入输出的动态 malloc 过程。
-- [cpp/4th_no_malloc](https://gitee.com/iwaihou/cv_learning_from_scratch/tree/master/new_version_with_notes/practice/cpp/4th_no_malloc) 目录下存放是第四版优化的 c++ 代码，删除了所有动态内存申请的操作，大幅提高性能。
-- [cpp/5th_codegen](https://gitee.com/iwaihou/cv_learning_from_scratch/tree/master/new_version_with_notes/practice/cpp/5th_codegen) 目录下存放是第五版优化的 c++ 代码，利用 CodeGen 和 jit 编译技术生成核心计算逻辑。
-- [cpp/6th_mul_thread](https://gitee.com/iwaihou/cv_learning_from_scratch/tree/master/new_version_with_notes/practice/cpp/6th_mul_thread) 目录下存放是第六版优化的 c++ 代码，利用多线程优化卷积的运算，大幅提升性能。
+- [cpp/1st_origin](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/1st_origin) 目录下存放的是第一版的 C++ 代码
+- [cpp/2nd_avx2](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/2nd_avx2) 目录下存放的是第二版的 C++ 代码，启用了 **avx2 指令集的优化，以及 -Ofast 编译选项**
+- [cpp/3rd_preload](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/3rd_preload) 目录下存放的是第三版的 C++ 代码，利用类似内存池的方式，增加了**权值提前加载**的逻辑，仍保留了每一层结果输入输出的动态 malloc 过程。
+- [cpp/4th_no_malloc](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/4th_no_malloc) 目录下存放是第四版优化的 c++ 代码，删除了所有动态内存申请的操作，大幅提高性能。
+- [cpp/5th_codegen](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/5th_codegen) 目录下存放是第五版优化的 c++ 代码，利用 CodeGen 和 jit 编译技术生成核心计算逻辑。
+- [cpp/6th_mul_thread](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/6th_mul_thread) 目录下存放是第六版优化的 c++ 代码，利用多线程优化卷积的运算，大幅提升性能。
 
 #### 编译
 
@@ -195,7 +195,7 @@ python 不调用三方库的话，很多优化点无法去做(比如指令集不
 ```shell
 $ sudo apt-get install libopencv-dev python3-opencv libopencv-contrib-dev
 ```
-- cpp 目录下，运行 [compile.sh](https://gitee.com/iwaihou/cv_learning_from_scratch/blob/master/new_version_with_notes/practice/cpp/1st_origin/compile.sh) 即可完成编译。
+- cpp 目录下，运行 [compile.sh](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/1st_origin/compile.sh) 即可完成编译。
 ```shell
 $ bash ./compile.sh
 ```
@@ -206,7 +206,7 @@ $ ./resnet
 
 #### 初始版本一
 
-目录为 [cpp/1st_origin](https://gitee.com/iwaihou/cv_learning_from_scratch/tree/master/new_version_with_notes/practice/cpp/1st_origin)。
+目录为 [cpp/1st_origin](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/1st_origin)。
 
 第一版没有考虑性能问题，仅仅是按照想法完成了功能，可想而知性能惨不忍睹，此版本性能数据：
 
@@ -218,7 +218,7 @@ $ ./resnet
 
 #### 优化版本二
 
-目录为[cpp/2nd_avx2](https://gitee.com/iwaihou/cv_learning_from_scratch/tree/master/new_version_with_notes/practice/cpp/2nd_avx2)。
+目录为[cpp/2nd_avx2](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/2nd_avx2)。
 
 第二版在第一版的基础上，将卷积算法中的**乘累加**的循环运算，利用向量指令集做了并行化加速，采用的向量指令集为 avx2，你可以通过以下命令查看你的 CPU 是否支持 avx2 指令集。
 
@@ -235,7 +235,7 @@ $ cat /proc/cpuinfo
 
 #### 优化版本三
 
-目录为[cpp/3rd_preload](https://gitee.com/iwaihou/cv_learning_from_scratch/tree/master/new_version_with_notes/practice/cpp/3rd_preload) 。
+目录为[cpp/3rd_preload](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/3rd_preload) 。
 
 第三版在第二版的基础上，消除了运算推理过程中针对权值参数动态 malloc 的过程，改为在推理之前，利用 std::map 管理一个类内存池的结构，推理之前将所有的权值参数全部加载进来，这一步优化在实际模型部署中是有现实意义的。
 
@@ -249,7 +249,7 @@ $ cat /proc/cpuinfo
 
 #### 优化版本四
 
-目录为[cpp/4th_no_malloc](https://gitee.com/iwaihou/cv_learning_from_scratch/tree/master/new_version_with_notes/practice/cpp/4th_no_malloc) 。
+目录为[cpp/4th_no_malloc](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/4th_no_malloc) 。
 
 第四版在第三版的基础上，消除了运算推理过程中所有动态内存申请，以及与字符串相关的操作。
 
@@ -261,7 +261,7 @@ $ cat /proc/cpuinfo
 
 #### 优化版本五
 
-目录为[cpp/5th_codegen](https://gitee.com/iwaihou/cv_learning_from_scratch/tree/master/new_version_with_notes/practice/cpp/5th_codegen) 。
+目录为[cpp/5th_codegen](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/5th_codegen) 。
 
 第五版在第四版的基础上，利用 CodeGen 技术生成核心计算逻辑，利用 jit 编译完成编译过程。
 
@@ -273,7 +273,7 @@ $ cat /proc/cpuinfo
 
 #### 优化版本六
 
-目录为[cpp/6th_mul_thread](https://gitee.com/iwaihou/cv_learning_from_scratch/tree/master/new_version_with_notes/practice/cpp/6th_mul_thread)。
+目录为[cpp/6th_mul_thread](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/6th_mul_thread)。
 
 第六版在第五版的基础上，利用多线程来优化了卷积计算，对 co 维度进行了线程间的独立拆分，用满 CPU 线程数。
 
@@ -302,10 +302,10 @@ $ pip3 install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
 ---
-## 其他
+## 其他 Contact me
 
 - 本项目所有代码和相关文章，均为个人原创，未经同意，请勿随意转载至任何平台，更不可用于商业目的，我已委托相关维权人士对原创文章和代码进行监督。
-- 如果你有其他相关事宜，欢迎和我交流。
+- 如果你有其他相关事宜，欢迎和我交流(微信wechat：ddcsggcs，or email: dongtuoc@yeah.net)。
 
 ---
 ## 愿人人都可快速入门 AI 视觉。
