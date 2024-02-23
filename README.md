@@ -1,7 +1,8 @@
 # cv_learning_resnet50
 
+If you cannot understand Chinese, please refer to [this section](https://github.com/dongtuoc/cv_learning_resnet50/blob/main/README.en.md).
 ---
-## 项目介绍
+## Project Introduction
 
 ### 本项目在做什么
 
