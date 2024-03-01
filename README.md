@@ -26,6 +26,8 @@ If you cannot understand Chinese, please refer to [this section](https://github.
 
 - 实战部分在完成手写算法的基础上，除了要保证网络精度可用(也就是任意给一张图片，经过预处理之后，Top1/Top5 可以正确的预测出图片) 之外，还会关注性能优化部分，这一点后面会有介绍。
 
+- 代码实战的 C++ 部分以及性能优化部分，依赖于 Intel CPU 进行。为什么用 CPU？因为这是大家都能接触到的一个芯片(有电脑基本都会有 Intel CPU)，而 GPU 很多同学接触不到，并且 GPU 的编程难度也会大一些。
+
 ---
 ### 为什么要全部手写核心算法
 
