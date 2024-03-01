@@ -21,6 +21,8 @@ Finally, through hands-on coding in this repository, the project involves writin
   - Since the algorithms and model structures are handwritten, there is considerable flexibility for performance optimization. Performance optimization is the final part of the project, involving iterations of multiple versions to gradually improve the model's performance.
 - In the practical section, besides ensuring the network's accuracy (i.e., correctly predicting the image's Top1/Top5 after preprocessing any given image), performance optimization is also emphasized, as described later.
 
+- The hands-on coding part of C++ and the performance optimization sections rely on Intel CPUs. Why use a CPU? Because it's a chip that everyone can access (almost all computers have Intel CPUs), whereas many students may not have access to GPUs, and the programming difficulty of GPUs is also higher.
+
 ---
 ### Why write all core algorithms from scratch
 
