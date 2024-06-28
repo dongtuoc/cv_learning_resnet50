@@ -10,117 +10,28 @@
 #include <vector>
 
 #include "../label.h"
+#include "../utils.h"
 #include "resnet_avx2.h"
 
-std::vector<std::string> getFileName() {
-  std::vector<std::string> filenames;
-  std::string dir_path("../../pics/ani_12/");
-  // filenames.push_back(dir_path + std::string("Niu.jpg"));
-  // return filenames;
-  DIR* dir = opendir(dir_path.c_str());
-  if (dir == nullptr) {
-    std::cerr << "Failed to open directory: " << dir_path << std::endl;
-    exit(0);
-  }
-  dirent* entry;
-  while ((entry = readdir(dir)) != nullptr) {
-    if (entry->d_type == DT_REG) {
-      filenames.push_back(dir_path + std::string(entry->d_name));
-    }
-  }
-  closedir(dir);
-  std::cout << "\033[0;32m\nLoaded Pics List: \033[0m" << std::endl;
-  for (const auto& filename : filenames) {
-    std::cout << filename << std::endl;
-  }
-  std::cout << "\n" << std::endl;
-  return filenames;
-}
-
-float* preprocess(const std::string& file_name) {
-  auto transpose2d = [](uint8_t* src, uint8_t* dst) {
-    memcpy(dst, src, 224 * 224 * 3);
-    return;
-    // NCHW->NHWC
-    // for (int i = 0; i < 3; i++) {
-    //   for (int j = 0; j < 224 * 224; j++) {
-    //     dst[j * 3 + i] = src[i * 224 * 224 + j];
-    //   }
-    // }
-  };
-
-  // auto show = [](cv::Mat img, int h, int w) {
-  //   for (int i = 0; i < h; i++) {
-  //     for (int j = 0; j < w; j++) {
-  //       printf("%d %d %d\n", ((uint8_t*)img.data)[i * w * 3 + j * 3 + 0],
-  //              ((uint8_t*)img.data)[i * w * 3 + j * 3 + 1],
-  //              ((uint8_t*)img.data)[i * w * 3 + j * 3 + 2]);
-  //     }
-  //   }
-  //   exit(0);
-  // };
-
-  float* mat_data = (float*)malloc(224 * 224 * 3 * sizeof(float));
-  cv::Mat source_o, img_o, img_r;
-  source_o = cv::imread(file_name);
-  // printf("%d %d\n", source_o.rows, source_o.cols);
-  cv::cvtColor(source_o, img_o, cv::COLOR_BGR2RGB);
-  cv::resize(img_o, img_r, {224, 224});
-  // show(img_r, 256, 256);
-
-  uint8_t* trans_data = (uint8_t*)malloc(224 * 224 * 3 * sizeof(uint8_t));
-  // NCHW -> NHWC
-  transpose2d((uint8_t*)img_r.data, trans_data);
-
-  for (int i = 0; i < 224; i++) {
-    for (int j = 0; j < 224; j++) {
-      mat_data[i * 224 * 3 + j * 3 + 0] =
-          ((trans_data[i * 224 * 3 + j * 3 + 0] / 255.0) - 0.485) / 0.229;  // R
-      mat_data[i * 224 * 3 + j * 3 + 1] =
-          ((trans_data[i * 224 * 3 + j * 3 + 1] / 255.0) - 0.456) / 0.224;  // G
-      mat_data[i * 224 * 3 + j * 3 + 2] =
-          ((trans_data[i * 224 * 3 + j * 3 + 2] / 255.0) - 0.406) / 0.225;  // B
-    }
-  }
-  return mat_data;
-}
-
-void show_res(float* res) {
-  int n_ele = 1000;
-  std::vector<std::pair<float, int>> sort_pairs;
-  for (int i = 0; i < n_ele; ++i) {
-    sort_pairs.emplace_back(res[i], i);
-  }
-  std::sort(sort_pairs.begin(), sort_pairs.end(),
-            [](const std::pair<float, int>& a, const std::pair<float, int>& b) {
-              return a.first > b.first;
-            });
-  auto labels = load_imagenet_labels();
-  const int topk = 5;
-  for (int i = 0; i < topk; ++i) {
-    std::cout << "top " << (i + 1) << " " << sort_pairs[i].first << " -> Index=["
-              << sort_pairs[i].second << "]"
-              << ", Label=[" << labels[sort_pairs[i].second] << "]" << std::endl;
-  }
-  std::cout << "\n" << std::endl;
-}
-
-auto getTime() {
-  auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
-                       std::chrono::system_clock::now().time_since_epoch())
-                       .count();
-  return timestamp;
-}
-
+// 主函数入口
+// 这段代码展示了如何在 C++ 中利用加载的权重和网络结构进行图像分类的计算过程。
+// 它还包括了性能度量，如平均延迟和吞吐量的计算
 int main() {
-  const auto& files = getFileName();
-  int total_time = 0;
+  // 获取需要预测的图片和标签
+  const auto& files = GetFileName();
+  int total_time = 0;  // 总耗时清零
+
+  // 遍历每个文件
   for (auto it : files) {
-    auto start = getTime();
-    std::cout << "Predict : " << it << std::endl;
-    auto img = preprocess(it);
-    int h0, w0, c0;
+    std::cout << "Predict : " << it.first << std::endl;  // 打印正在处理的文件名
+
+    // 图像预处理
+    auto img = PreProcess(it.first);
+    int h0, w0, c0;  // 用于存储层输出的尺寸
     int h1, w1, c1;
+
+    // 通过网络层处理图像
+    auto start = GetTime();  // 开始时间
     img = compute_conv_layer(img, 224, 224, h1, w1, c1, "conv1");
     img = compute_bn_layer(img, h1, w1, c1, "bn1");
     img = compute_relu_layer(img, h1 * w1 * c1);
@@ -149,14 +60,27 @@ int main() {
     img = compute_avgpool_layer(img);
     // Linear
     img = compute_fc_layer(img, "fc");
-
-    auto end = getTime();
+    // 结束时间和耗时计算
+    auto end = GetTime();
     int time = end - start;
     total_time += time;
-    std::cout << "\033[0;32mTime cost : " << time << " ms.\033[0m" << std::endl;
-    show_res(img);
+
+    // 展示结果
+    int res_label = ShowResult(img);
+    // 检查预测结果是否与标签一致
+    if (res_label == it.second) {
+      std::cout << "\033[0;32mInference Result Succ \033[0m" << std::endl;
+    } else {
+      std::cout << "\033[0;31mInference Result Fail: Golden Label: " << it.second
+                << ", Res Lable: " << res_label << "\033[0m" << std::endl;
+    }
+    std::cout << "\033[0;32mTime cost : " << time << " ms.\033[0m\n" << std::endl;
+
+    // 释放内存
     free(img);
   }
+
+  // 计算平均延迟和吞吐量
   float latency = (float)(total_time) / (float)(files.size());
   std::cout << "\033[0;32mAverage Latency : " << latency << "ms \033[0m" << std::endl;
   std::cout << "\033[0;32mAverage Throughput : " << (1000 / latency) << "fps \033[0m" << std::endl;

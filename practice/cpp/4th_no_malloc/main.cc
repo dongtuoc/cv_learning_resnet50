@@ -10,155 +10,42 @@
 #include <vector>
 
 #include "../label.h"
+#include "../utils.h"
 #include "./resnet_no_malloc.h"
 
 extern int put_cnt;
 extern int out_cnt;
 extern void* __global_weight[MAX_MEM_NUM];
 
-static std::map<std::string, int> GetFileName() {
-  std::map<std::string, int> res;
-  std::string dir_path("../../pics/ani_12/");
-  DIR* dir = opendir(dir_path.c_str());
-  if (dir == nullptr) {
-    std::cerr << "Failed to open directory: " << dir_path << std::endl;
-    exit(0);
-  }
-  dirent* entry;
-  std::vector<std::string> filenames;
-  while ((entry = readdir(dir)) != nullptr) {
-    if (entry->d_type == DT_REG) {
-      filenames.push_back(dir_path + std::string(entry->d_name));
-    }
-  }
-  closedir(dir);
-
-  int label = 0;
-  for (const auto& filename : filenames) {
-    if (filename == "../../pics/ani_12/LaoHu.jpg") {
-      label = 292;
-    } else if (filename == "../../pics/ani_12/Ji.jpg") {
-      label = 7;
-    } else if (filename == "../../pics/ani_12/HouZi.jpg") {
-      label = 373;
-    } else if (filename == "../../pics/ani_12/TuZi.jpg") {
-      label = 282;
-    } else if (filename == "../../pics/ani_12/Yang.jpg") {
-      label = 348;
-    } else if (filename == "../../pics/ani_12/Niu.jpg") {
-      label = 345;
-    } else if (filename == "../../pics/ani_12/LaoShu.jpg") {
-      label = 367;
-    } else if (filename == "../../pics/ani_12/Ma.jpg") {
-      label = 268;
-    } else if (filename == "../../pics/ani_12/Zhu.jpg") {
-      label = 341;
-    } else if (filename == "../../pics/ani_12/Long.jpg") {
-      label = 39;
-    } else if (filename == "../../pics/ani_12/Gou.jpg") {
-      label = 258;
-    } else if (filename == "../../pics/ani_12/She.jpg") {
-      label = 53;
-    } else {
-      std::cout << "No Golden Label for " << filename << std::endl;
-    }
-    res[filename] = label;
-  }
-
-  std::cout << "\033[0;32m\nLoaded Pics List: \033[0m" << std::endl;
-  for (auto it : res) {
-    std::cout << it.first << ", lable: " << it.second << std::endl;
-  }
-  std::cout << "\n" << std::endl;
-  return res;
-}
-
-static void PreProcess(const std::string& file_name, void* out) {
-  auto transpose2d = [](uint8_t* src, uint8_t* dst) {
-    memcpy(dst, src, 224 * 224 * 3);
-    return;
-    // NCHW->NHWC
-    // for (int i = 0; i < 3; i++) {
-    //   for (int j = 0; j < 224 * 224; j++) {
-    //     dst[j * 3 + i] = src[i * 224 * 224 + j];
-    //   }
-    // }
-  };
-
-  float* mat_data = (float*)out;
-  cv::Mat source_o, img_o, img_r;
-  source_o = cv::imread(file_name);
-  cv::cvtColor(source_o, img_o, cv::COLOR_BGR2RGB);
-  cv::resize(img_o, img_r, {224, 224});
-
-  uint8_t* trans_data = (uint8_t*)malloc(224 * 224 * 3 * sizeof(uint8_t));
-  // NCHW -> NHWC
-  transpose2d((uint8_t*)img_r.data, trans_data);
-
-  for (int i = 0; i < 224; i++) {
-    for (int j = 0; j < 224; j++) {
-      mat_data[i * 224 * 3 + j * 3 + 0] =
-          ((trans_data[i * 224 * 3 + j * 3 + 0] / 255.0) - 0.485) / 0.229;  // R
-      mat_data[i * 224 * 3 + j * 3 + 1] =
-          ((trans_data[i * 224 * 3 + j * 3 + 1] / 255.0) - 0.456) / 0.224;  // G
-      mat_data[i * 224 * 3 + j * 3 + 2] =
-          ((trans_data[i * 224 * 3 + j * 3 + 2] / 255.0) - 0.406) / 0.225;  // B
-    }
-  }
-  free(trans_data);
-}
-
-int ShowResult(void* res0) {
-  float* res = (float*)res0;
-  int n_ele = 1000;
-  std::vector<std::pair<float, int>> sort_pairs;
-  for (int i = 0; i < n_ele; ++i) {
-    sort_pairs.emplace_back(res[i], i);
-  }
-  std::sort(sort_pairs.begin(), sort_pairs.end(),
-            [](const std::pair<float, int>& a, const std::pair<float, int>& b) {
-              return a.first > b.first;
-            });
-  auto labels = load_imagenet_labels();
-  const int topk = 5;
-  std::cout << ">>> Result:" << std::endl;
-  for (int i = 0; i < topk; ++i) {
-    std::cout << "top " << (i + 1) << " " << sort_pairs[i].first << " -> Index=["
-              << sort_pairs[i].second << "]"
-              << ", Label=[" << labels[sort_pairs[i].second] << "]" << std::endl;
-  }
-  return sort_pairs[0].second;
-}
-
-int GetTime() {
-  int timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
-                      std::chrono::system_clock::now().time_since_epoch())
-                      .count();
-  return timestamp;
-}
-
 int main() {
+  // 预加载神经网络的所有参数到 __global_weight 中
   PreLoadParams();
+  // 获取文件名列表
   const auto& files = GetFileName();
   int total_time = 0;
 
+  // 分配全局内存空间
   void* __global_mem_main0 = malloc(8 * 1024 * 1024);
   void* __global_mem_main1 = malloc(8 * 1024 * 1024);
   void* __global_mem_temp = malloc(8 * 1024 * 1024);
 
+  // 遍历每个文件进行推理预测
   for (auto it : files) {
-    out_cnt = 0;
+    out_cnt = 0;  // 重置输出计数器，用来对从 __global_weight 里取权值进行计数操作
     std::cout << "\nBegin to predict : " << it.first << std::endl;
+    // 对原始输入图像进行预处理
     PreProcess(it.first, __global_mem_main0);
 
     int h0, w0, c0;
     int h1, w1, c1;
 
-    int start = GetTime();
+    int start = GetTime();  // 记录推理开始时间
+    // 执行各层的计算
     ComputeLayerConv2d(__global_mem_main0, __global_mem_main1, 224, 224, h1, w1, c1);
     ComputeLayerBatchNorm(__global_mem_main1, __global_mem_main0, h1, w1, c1);
     ComputeLayerRelu(__global_mem_main0, h1 * w1 * c1);
     ComputeLayerMaxPool(__global_mem_main0, __global_mem_main1);
+    // 执行残差块的计算
     // layer1
     ComputeBottleNeck(__global_mem_main1, __global_mem_main0, __global_mem_temp, 56, 56, h1, w1, c1,
                       true);
@@ -200,11 +87,11 @@ int main() {
     // Linear
     ComputeLayerFC(__global_mem_main0, __global_mem_main1);
 
-    int end = GetTime();
-    int time = end - start;
-    total_time += time;
+    int end = GetTime();     // 记录推理结束时间
+    int time = end - start;  // 计算耗时
+    total_time += time;      // 计算所有图片的总耗时，用于计算平均值
 
-    int res_label = ShowResult(__global_mem_main1);
+    int res_label = ShowResult(__global_mem_main1);  // 显示结果
     if (res_label == it.second) {
       std::cout << "\033[0;32mInference Result Succ \033[0m" << std::endl;
     } else {
@@ -213,9 +100,11 @@ int main() {
     }
     std::cout << "\033[0;32mTime cost : " << time << " ms.\033[0m\n" << std::endl;
   }
+  // 计算平均延迟和吞吐量
   float latency = (float)(total_time) / (float)(files.size());
   std::cout << "\033[0;32mAverage Latency : " << latency << "ms \033[0m" << std::endl;
   std::cout << "\033[0;32mAverage Throughput : " << (1000 / latency) << "fps \033[0m" << std::endl;
+  // 释放内存资源
   for (int i = 0; i < MAX_MEM_NUM; i++) {
     if (__global_weight[i] != nullptr) free(__global_weight[i]);
   }

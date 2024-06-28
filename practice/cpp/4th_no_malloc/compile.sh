@@ -4,6 +4,6 @@ rm build -rf
 mkdir build
 cd build
 cmake ..
-make
+make -j16
 cd ..
 mv build/resnet .

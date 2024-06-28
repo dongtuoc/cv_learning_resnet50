@@ -50,8 +50,6 @@ Through this project, you can gain insights into classical algorithms of traditi
 
 You can refer to the code in the project to actually run a ResNet50 neural network and perform inference on one or multiple images.
 
-In the "new_version_with_notes" directory of the project, there is a version with **comments**, where I provide textual explanations for key parts of the code.
-
 If you go through the project code and accompanying articles thoroughly, and practice with them, I believe that getting started with AI vision is not difficult. Moreover, even if you are a beginner, after fully practicing with ResNet50, you can consider yourself proficient.
 
 ---
@@ -84,8 +82,6 @@ The **python** and **cpp** directories are independent of each other.
 
 Within the **cpp** directory, there are 6 directories labeled from **1st** to **6th**, representing iterations of performance optimization. Each directory can be run independently to compare the performance improvement achieved through code optimization during each iteration.
 
-- **new_version_with_notes**: This is a new version of the repository containing all the aforementioned code, with a replicated directory structure. The difference is that comments have been added to the code and some details have been optimized. For first-time users, it is recommended to use the code under the **new_version_with_notes** directory.
-
 ---
 ## How I Implemented ResNet50 from Scratch
 
@@ -111,13 +107,13 @@ $ python3 resnet50_parser.py
 After saving the weights, core functions such as Conv2d, BatchNorm, Relu, AvgPool, MaxPool, FullyConnect (MatMul), etc., are implemented separately using Python/C++.
 
 Following the [ResNet50 network structure](https://mp.weixin.qq.com/s/nIeu58iSy5-cTafkvFxdig), these algorithms are pieced together.
-- For the model files, refer to [model/resnet50.onnx.png](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/model/resnet50.onnx.png) and [model/resnet50_structure.txt](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/model/resnet50_structure.txt).
-- For the manually constructed ResNet50 network structure, refer to [the Python version I manually built](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/python/infer.py#L354).
+- For the model files, refer to [model/resnet50.onnx.png](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/practice/model/resnet50.onnx.png) and [model/resnet50_structure.txt](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/practice/model/resnet50_structure.txt).
+- For the manually constructed ResNet50 network structure, refer to [the Python version I manually built](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/practice/python/infer.py#L354).
 
 #### Inference
 
 After implementing the code, implying that the basic algorithm and parameters required for model operation are in place, the next step is to read a local image and perform inference.
-- Read an image of a cat, refer to [Get Image](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/python/infer.py#L296).
+- Read an image of a cat, refer to [Get Image](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/practice/python/infer.py#L296).
 
 After reading the image, inference begins, and correctly inferring it as a cat completes the primary goal of this project (accuracy verification).
 
@@ -161,7 +157,7 @@ Since the Python version also barely calls third-party libraries and writes conv
 #### A Bit of Optimization for the Python Version
 
 Use np.dot (inner product) instead of convolution's multiply-accumulate loop.
-- Optimized version of the Python implementation: [Optimized Version](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/python/ops/conv2d.py#L73)
+- Optimized version of the Python implementation: [Optimized Version](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/practice/python/ops/conv2d.py#L73)
 
 Since Python does not call third-party libraries, many optimization points cannot be addressed (such as controlling instruction sets and memory). Below, I will focus on optimizing the C++ version.
 
@@ -174,12 +170,12 @@ This section covers performance optimization for the C++ version. Let's first un
 
 The C++ code in this repository has been integrated with several optimization commits, each time building on the previous optimization. You can easily see the optimization records through the filenames under the cpp directory.
 
-- [cpp/1st_origin](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/1st_origin): Contains the code for the first version of C++.
-- [cpp/2nd_avx2](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/2nd_avx2): Contains the code for the second version of C++, which enables **AVX2 instruction set optimization** and uses the **-Ofast compilation option**.
-- [cpp/3rd_preload](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/3rd_preload): Contains the code for the third version of C++, which utilizes a memory pool-like approach to add **preloading logic for weights**, while still maintaining dynamic malloc for input and output of each layer's results.
-- [cpp/4th_no_malloc](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/4th_no_malloc): Contains the code for the fourth optimized version of C++, which removes all dynamic memory allocation operations, significantly improving performance.
-- [cpp/5th_codegen](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/5th_codegen): Contains the code for the fifth optimized version of C++, which utilizes CodeGen and jit compilation techniques to generate core calculation logic.
-- [cpp/6th_mul_thread](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/6th_mul_thread): Contains the code for the sixth optimized version of C++, which utilizes multithreading to optimize convolution operations, greatly improving performance.
+- [cpp/1st_origin](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/practice/cpp/1st_origin): Contains the code for the first version of C++.
+- [cpp/2nd_avx2](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/practice/cpp/2nd_avx2): Contains the code for the second version of C++, which enables **AVX2 instruction set optimization** and uses the **-Ofast compilation option**.
+- [cpp/3rd_preload](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/practice/cpp/3rd_preload): Contains the code for the third version of C++, which utilizes a memory pool-like approach to add **preloading logic for weights**, while still maintaining dynamic malloc for input and output of each layer's results.
+- [cpp/4th_no_malloc](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/practice/cpp/4th_no_malloc): Contains the code for the fourth optimized version of C++, which removes all dynamic memory allocation operations, significantly improving performance.
+- [cpp/5th_codegen](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/practice/cpp/5th_codegen): Contains the code for the fifth optimized version of C++, which utilizes CodeGen and jit compilation techniques to generate core calculation logic.
+- [cpp/6th_mul_thread](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/practice/cpp/6th_mul_thread): Contains the code for the sixth optimized version of C++, which utilizes multithreading to optimize convolution operations, greatly improving performance.
 
 #### Compilation
 
@@ -193,7 +189,7 @@ If you have a Linux environment and are familiar with Linux operations, please p
 ```shell
 $ sudo apt-get install libopencv-dev python3-opencv libopencv-contrib-dev
 ```
-- Under the cpp directory, run [compile.sh](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/1st_origin/compile.sh) to compile the files.
+- Under the cpp directory, run [compile.sh](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/practice/cpp/1st_origin/compile.sh) to compile the files.
 ```shell
 $ bash ./compile.sh
 ```
@@ -204,7 +200,7 @@ $ ./resnet
 
 ### Initial Version One
 
-Directory: [cpp/1st_origin](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/1st_origin).
+Directory: [cpp/1st_origin](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/practice/cpp/1st_origin).
 
 The first version did not consider performance issues, merely completing the functionality according to the idea. As a result, the performance was extremely poor. Here are the performance metrics for this version:
 
@@ -216,7 +212,7 @@ Performance data may vary depending on the computer's performance. You can try r
 
 ### Optimized Version Two
 
-Directory: [cpp/2nd_avx2](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/2nd_avx2).
+Directory: [cpp/2nd_avx2](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/practice/cpp/2nd_avx2).
 
 The second version, based on the first version, parallelizes the **multiply-accumulate** loop operations in the convolution algorithm using vector instruction sets for accelerated parallelization. It utilizes the AVX2 vector instruction set. You can check if your CPU supports the AVX2 instruction set with the following command:
 
@@ -234,7 +230,7 @@ Here are the performance metrics for this version:
 
 ### Optimized Version Three
 
-Directory: [cpp/3rd_preload](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/3rd_preload).
+Directory: [cpp/3rd_preload](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/practice/cpp/3rd_preload).
 
 The third version, based on the second version, eliminates the dynamic malloc process for weight parameters during inference. Instead, before inference, it manages a class memory pool structure using std::map to preload all weight parameters. This optimization has practical significance in actual model deployment.
 
@@ -248,7 +244,7 @@ Here are the performance metrics for this version:
 
 ### Optimized Version Four
 
-Directory: [cpp/4th_no_malloc](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/4th_no_malloc).
+Directory: [cpp/4th_no_malloc](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/practice/cpp/4th_no_malloc).
 
 The fourth version, based on the third version, eliminates all dynamic memory allocation operations and string-related operations during inference.
 
@@ -260,7 +256,7 @@ Here are the performance metrics for this version:
 
 ### Optimized Version Five
 
-Directory: [cpp/5th_codegen](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/5th_codegen).
+Directory: [cpp/5th_codegen](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/practice/cpp/5th_codegen).
 
 The fifth version, based on the fourth version, utilizes CodeGen technology to generate core calculation logic and completes the compilation process using jit compilation.
 
@@ -272,7 +268,7 @@ Here are the performance metrics for this version:
 
 ### Optimized Version Six
 
-Directory: [cpp/6th_mul_thread](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/new_version_with_notes/practice/cpp/6th_mul_thread).
+Directory: [cpp/6th_mul_thread](https://github.com/dongtuoc/cv_learning_resnet50/tree/main/practice/cpp/6th_mul_thread).
 
 The sixth version, based on the fifth version, optimizes convolution calculations using multithreading, independently splitting threads for the co dimension, using all CPU threads.
 

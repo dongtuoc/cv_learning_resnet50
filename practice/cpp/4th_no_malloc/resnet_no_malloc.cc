@@ -13,53 +13,66 @@
 #include "ops/fc.h"
 #include "ops/pool.h"
 
-// unlikely to predict un-commonly-used branches
+// 4_no_malloc 相比于 3_preload 而言，在模型的整个推理代码路径上，不存在任何利用 malloc
+// 申请内存的操作，将内存申请的操作全部放在推理之前完成 计算过程中用到的内存，通过 main.cc
+// 中的推理之前申请的 3 个全局内存来交替使用完成的：__global_mem_main0， __global_mem_main1，
+// __global_mem_main2
+
+// 使用 __builtin_expect 宏来优化代码，提高分支预测效率（通常用于优化很少执行的代码路径）
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
-// optimize by pre-load params of networks
+// 定义全局权重数组，用于存储网络参数
 void* __global_weight[MAX_MEM_NUM] = {nullptr};
 
-int put_cnt = 0;
-int out_cnt = 0;
+// 定义全局计数器
+int put_cnt = 0;  // 用于统计已加载的参数数量
+int out_cnt = 0;  // 用于记录已读取的参数数量
 
+// 模板函数，用于从文件中加载数据
 template <typename T>
 void* LoadData(const std::string& file_name, int len, bool is_float) {
-  T* data = (T*)malloc(len * sizeof(T));
-  FILE* fp = fopen(file_name.c_str(), "r");
-  // std::cout << "file_name = " << file_name << ", fp = " << fp << std::endl;
+  T* data = (T*)malloc(len * sizeof(T));     // 分配内存
+  FILE* fp = fopen(file_name.c_str(), "r");  // 打开文件
   for (auto i = 0; i < len; i++) {
     float x = 0;
-    fscanf(fp, "%f", &x);
-    data[i] = is_float ? x : (int)x;
+    fscanf(fp, "%f", &x);             // 读取数据
+    data[i] = is_float ? x : (int)x;  // 根据类型转换数据
   }
-  fclose(fp);
-  __global_weight[put_cnt++] = data;
-  return (void*)data;
+  fclose(fp);                         // 关闭文件
+  __global_weight[put_cnt++] = data;  // 将读取的权值指针存入全局数组
+  return (void*)data;                 // 返回数据指针
 }
 
+// 预加载卷积层权重的函数
 float* LoadCon2dWeightPreLoad(const std::string& name, int len) {
   auto file_name = "../../model/resnet50_weight/resnet50_" + name + "_weight.txt";
-  return (float*)LoadData<float>(file_name, len, true);
+  return (float*)LoadData<float>(file_name, len, true);  // 调用 LoadData 函数加载数据
 }
 
+// 获取卷积层权重的函数
 float* LoadCon2dWeight() { return (float*)__global_weight[out_cnt++]; }
 
+// 预加载卷积层参数的函数
 int* LoadCon2dParamPreLoad(const std::string& name, int len) {
   auto file_name = "../../model/resnet50_weight/resnet50_" + name + "_param.txt";
-  return (int*)LoadData<int>(file_name, len, false);
+  return (int*)LoadData<int>(file_name, len, false);  // 调用 LoadData 函数加载数据
 }
 
+// 获取卷积层参数的函数
 int* LoadCon2dParam() { return (int*)__global_weight[out_cnt++]; }
 
+// 预加载激活层（ReLU）的函数，不执行任何操作
 void ComputeLayerReluPreLoad(void* img_in, int len) { return; }
 
+// 实现激活层（ReLU）的计算
 void ComputeLayerRelu(void* img_in, int len) {
   float* img = (float*)img_in;
   for (int i = 0; i < len; i++) {
-    img[i] = img[i] > 0 ? img[i] : 0;
+    img[i] = img[i] > 0 ? img[i] : 0;  // 应用 ReLU 激活函数
   }
 }
 
+// 预加载卷积层计算的函数，不执行任何操作
 void ComputeLayerConv2dPreLoad(void* img_in,
                                void* img_out,
                                int hi,
@@ -69,50 +82,48 @@ void ComputeLayerConv2dPreLoad(void* img_in,
                                int& co,
                                const std::string& layer_name) {
   auto param = LoadCon2dParamPreLoad(layer_name, 5);
-  // ci, co, kernel, stride, pad
+  // 提取卷积层参数：输入通道数、输出通道数、卷积核大小、步长和填充
   auto ci = param[0];
   co = param[1];
   auto kernel = param[2];
   auto stride = param[3];
   auto pad = param[4];
   auto weight = LoadCon2dWeightPreLoad(layer_name, co * kernel * kernel * ci);
-  if (hi == 224) {
-    return MyConv2dPreLoad(img_in, img_out, weight, hi, wi, ho, wo, ci, co, kernel, stride, pad);
-  } else {
-    return MyConv2dPreLoad(img_in, img_out, weight, hi, wi, ho, wo, ci, co, kernel, stride, pad);
-  }
+  return MyConv2dPreLoad(img_in, img_out, weight, hi, wi, ho, wo, ci, co, kernel, stride, pad);
 }
 
+// 计算卷积层
 void ComputeLayerConv2d(void* img_in, void* img_out, int hi, int wi, int& ho, int& wo, int& co) {
   auto param = LoadCon2dParam();
-  // ci, co, kernel, stride, pad
   auto ci = param[0];
   co = param[1];
   auto kernel = param[2];
   auto stride = param[3];
   auto pad = param[4];
   auto weight = LoadCon2dWeight();
-  if (hi == 224) {
-    return MyConv2d(img_in, img_out, weight, hi, wi, ho, wo, ci, co, kernel, stride, pad, true);
+  if (hi == 224) {  // 卷积第一层
+    MyConv2d(img_in, img_out, weight, hi, wi, ho, wo, ci, co, kernel, stride, pad, true);
   } else {
-    return MyConv2d(img_in, img_out, weight, hi, wi, ho, wo, ci, co, kernel, stride, pad, false);
+    MyConv2d(img_in, img_out, weight, hi, wi, ho, wo, ci, co, kernel, stride, pad, false);
   }
 }
 
+// 预加载全连接层的函数
 void ComputeLayerFCPreLoad(void* img_in, void* img_out, const std::string& layer_name) {
   auto weight_file_name = "../../model/resnet50_weight/resnet50_" + layer_name + "_weight.txt";
   auto bias_file_name = "../../model/resnet50_weight/resnet50_" + layer_name + "_bias.txt";
   LoadData<float>(weight_file_name, 1000 * 2048, true);
   LoadData<float>(bias_file_name, 1000, true);
-  return;
 }
 
+// 计算全连接层
 void ComputeLayerFC(void* img_in, void* img_out) {
   auto weight = (float*)__global_weight[out_cnt++];
   auto bias = (float*)__global_weight[out_cnt++];
-  return MyFC(img_in, img_out, weight, bias);
+  MyFC(img_in, img_out, weight, bias);
 }
 
+// 预加载批量归一化层的函数
 void ComputeLayerBatchNormPreLoad(
     void* in_data, void* out_data, int h, int w, int c, const std::string& layer_name) {
   auto weight_file_name = "../../model/resnet50_weight/resnet50_" + layer_name + "_weight.txt";
@@ -123,29 +134,34 @@ void ComputeLayerBatchNormPreLoad(
   LoadData<float>(bias_file_name, c, true);
   LoadData<float>(mean_file_name, c, true);
   LoadData<float>(var_file_name, c, true);
-  return;
 }
 
+// 计算批量归一化层
 void ComputeLayerBatchNorm(void* in_data, void* out_data, int h, int w, int c) {
   auto gamma = (float*)__global_weight[out_cnt++];
   auto bias = (float*)__global_weight[out_cnt++];
   auto mean = (float*)__global_weight[out_cnt++];
   auto var = (float*)__global_weight[out_cnt++];
-  return MyBatchNorm(in_data, out_data, mean, var, gamma, bias, h, w, c);
+  MyBatchNorm(in_data, out_data, mean, var, gamma, bias, h, w, c);
 }
 
+// 预加载最大池化层的函数（不执行任何操作）
 void ComputeLayerMaxPoolPreLoad(void* in_data, void* out_data) { return; }
 
-void ComputeLayerMaxPool(void* in_data, void* out_data) { return MyMaxPool(in_data, out_data); }
+// 计算最大池化层
+void ComputeLayerMaxPool(void* in_data, void* out_data) { MyMaxPool(in_data, out_data); }
 
+// 预加载平均池化层的函数（不执行任何操作）
 void ComputeLayerAvgPoolPreLoad(void* in_data, void* out_data) { return; }
 
-void ComputeLayerAvgPool(void* in_data, void* out_data) { return MyAvgPool(in_data, out_data); }
+// 计算平均池化层
+void ComputeLayerAvgPool(void* in_data, void* out_data) { MyAvgPool(in_data, out_data); }
 
+// 预加载加法运算的函数（不执行任何操作）
 void AddPreLoad(float* l, float* r, float* out, int len) { return; }
 
+// 实现加法运算
 void Add(float* l, float* r, float* out, int len) {
-#if 1
   for (int i = 0; i < len; i += 8) {
     out[i + 0] = l[i + 0] + r[i + 0];
     out[i + 1] = l[i + 1] + r[i + 1];
@@ -156,19 +172,10 @@ void Add(float* l, float* r, float* out, int len) {
     out[i + 6] = l[i + 6] + r[i + 6];
     out[i + 7] = l[i + 7] + r[i + 7];
   }
-#else
-  const int vec_size = 8;
-  __m256 l_vec, r_vec, res_vec;
-  for (int i = 0; i < len; i += vec_size) {
-    l_vec = _mm256_loadu_ps(l + i);
-    r_vec = _mm256_loadu_ps(r + i);
-    res_vec = _mm256_add_ps(l_vec, r_vec);
-    _mm256_storeu_ps(out + i, res_vec);
-  }
-#endif
   return;
 }
 
+// 预加载 BottleNeck 层函数，按照原有的 BottleNeck 结构直接调用相关层即可
 void ComputeBottleNeckPreLoad(void* in_data,
                               void* out_data,
                               void* temp_data,
@@ -217,6 +224,7 @@ void ComputeBottleNeckPreLoad(void* in_data,
   }
 }
 
+// BottleNeck 计算
 void ComputeBottleNeck(void* in_data,
                        void* out_data,
                        void* temp_data,
@@ -256,6 +264,7 @@ void ComputeBottleNeck(void* in_data,
   }
 }
 
+// 权值预加载主函数，调用的都是带 PreLoad 后缀的函数，区分不带PreLoad后缀的函数（用于推理计算）
 void PreLoadParams() {
   float* img0 = nullptr;
   float* img1 = nullptr;

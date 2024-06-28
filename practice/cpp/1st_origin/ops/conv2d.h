@@ -1,5 +1,4 @@
 #pragma once
-#include "common.h"
 
 float* my_conv2d(float* img,
                  float* weight,

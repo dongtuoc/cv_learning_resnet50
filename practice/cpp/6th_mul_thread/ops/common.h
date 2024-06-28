@@ -1,6 +1,5 @@
 #pragma once
 
-#define CODE_GEN (1)
 #include <iostream>
 #include <string>
 

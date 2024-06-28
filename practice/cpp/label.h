@@ -2,6 +2,9 @@
 
 #include <unordered_map>
 
+// 加载 imagenet 数据中的数据标签
+// 比如标签为1，代表的图像时金鱼（goldfish, Carassius auratus）
+// 共 1000 个分类标签
 std::unordered_map<int, std::string> load_imagenet_labels() {
   return {
       {0, "tench, Tinca tinca"},
